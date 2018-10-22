@@ -294,6 +294,7 @@ static const nxt_str_t  *nxt_app_msg_prefix[] = {
     &http_prefix,
     &http_prefix,
     &http_prefix,
+    &empty_prefix,
 };
 
 

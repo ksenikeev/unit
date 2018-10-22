@@ -216,12 +216,38 @@ static nxt_conf_map_t  nxt_ruby_app_conf[] = {
 };
 
 
+static nxt_conf_map_t  nxt_java_app_conf[] = {
+    {
+        nxt_string("classpath"),
+        NXT_CONF_MAP_STR,
+        offsetof(nxt_common_app_conf_t, u.java.classpath),
+    },
+    {
+        nxt_string("servlet"),
+        NXT_CONF_MAP_CSTRZ,
+        offsetof(nxt_common_app_conf_t, u.java.servlet),
+    },
+    {
+        nxt_string("webapp"),
+        NXT_CONF_MAP_CSTRZ,
+        offsetof(nxt_common_app_conf_t, u.java.webapp),
+    },
+    {
+        nxt_string("options"),
+        NXT_CONF_MAP_PTR,
+        offsetof(nxt_common_app_conf_t, u.java.options),
+    },
+
+};
+
+
 static nxt_conf_app_map_t  nxt_app_maps[] = {
     { nxt_nitems(nxt_external_app_conf),  nxt_external_app_conf },
     { nxt_nitems(nxt_python_app_conf),    nxt_python_app_conf },
     { nxt_nitems(nxt_php_app_conf),       nxt_php_app_conf },
     { nxt_nitems(nxt_perl_app_conf),      nxt_perl_app_conf },
     { nxt_nitems(nxt_ruby_app_conf),      nxt_ruby_app_conf },
+    { nxt_nitems(nxt_java_app_conf),      nxt_java_app_conf },
 };
 
 

@@ -1104,6 +1104,8 @@ nxt_unit_response_realloc(nxt_unit_request_info_t *req,
                + max_fields_count * sizeof(nxt_unit_field_t)
                + max_fields_size;
 
+    nxt_unit_req_debug(req, "realloc %"PRIu32"", buf_size);
+
     buf = nxt_unit_response_buf_alloc(req, buf_size);
     if (nxt_slow_path(buf == NULL)) {
         return NXT_UNIT_ERROR;
@@ -1622,7 +1624,9 @@ nxt_unit_buf_next(nxt_unit_buf_t *buf)
 
     lnk = &mmap_buf->link;
 
-    if (lnk == nxt_queue_last(&req_impl->incoming_buf)) {
+    if (lnk == nxt_queue_last(&req_impl->incoming_buf)
+        || lnk == nxt_queue_last(&req_impl->outgoing_buf))
+    {
         return NULL;
     }
 
@@ -1767,6 +1771,9 @@ nxt_unit_response_write_cb(nxt_unit_request_info_t *req,
     }
 
     while (!read_info->eof) {
+        nxt_unit_req_debug(req, "write_cb, alloc %"PRIu32"",
+                           read_info->buf_size);
+
         buf = nxt_unit_response_buf_alloc(req, nxt_min(read_info->buf_size,
                                                        PORT_MMAP_DATA_SIZE));
         if (nxt_slow_path(buf == NULL)) {

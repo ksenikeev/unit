@@ -1,0 +1,284 @@
+
+# Copyright (C) NGINX, Inc.
+
+
+shift
+
+NXT_JAVA_HOME=${JAVA_HOME-}
+
+for nxt_option; do
+
+    case "$nxt_option" in
+        -*=*) value=`echo "$nxt_option" | sed -e 's/[-_a-zA-Z0-9]*=//'`     ;;
+           *) value="" ;;
+    esac
+
+    case "$nxt_option" in
+
+        --module=*)    NXT_JAVA_MODULE="$value"                              ;;
+        --home=*)      NXT_JAVA_HOME="$value"                                ;;
+
+        --help)
+            cat << END
+
+    --module=NAME         set unit Java module name
+    --home=DIRECTORY      set Java home directory
+
+END
+            exit 0
+        ;;
+
+        *)
+            echo
+            echo $0: error: invalid Java option \"$nxt_option\"
+            echo
+            exit 1
+        ;;
+    esac
+
+done
+
+
+if [ ! -f $NXT_AUTOCONF_DATA ]; then
+   echo
+   echo Please run common $0 before configuring module \"$nxt_module\".
+   echo
+   exit 1
+fi
+
+. $NXT_AUTOCONF_DATA
+
+NXT_JAVA_MODULE=${NXT_JAVA_MODULE=java}
+
+$echo "configuring Java module"
+$echo "configuring Java module ..." >> $NXT_AUTOCONF_ERR
+
+nxt_found=no
+
+if [ -z "${NXT_JAVA_HOME}" ]; then
+    cat << END > $NXT_BUILD_DIR/GetHome.java
+public class GetHome {
+    public static void main(String[] args) {
+        System.out.println(System.getProperty("java.home"));
+    }
+}
+END
+
+    if /bin/sh -c "javac -d $NXT_BUILD_DIR $NXT_BUILD_DIR/GetHome.java" >> $NXT_AUTOCONF_ERR 2>&1; then
+        java_home=`java -cp $NXT_BUILD_DIR GetHome`
+        NXT_JAVA_HOME=${java_home%/jre}
+        $echo "checking for java.home ... ${java_home}"
+    else
+        $echo "checking for JDK ... not found"
+    fi
+
+    rm -f $NXT_BUILD_DIR/GetHome.java $NXT_BUILD_DIR/GetHome.class
+fi
+
+if [ -n "${NXT_JAVA_HOME}" \
+      -a -x "${NXT_JAVA_HOME}/bin/javac" \
+      -a -x "${NXT_JAVA_HOME}/bin/javah" ]; then
+
+    NXT_JAVA_INCLUDE="-I${NXT_JAVA_HOME}/include"
+
+    case "$NXT_SYSTEM" in
+        Linux)
+            NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/linux"
+            ;;
+        Darwin)
+            NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/darwin"
+            ;;
+    esac
+
+    NXT_JAVA_LDFLAGS="-L${NXT_JAVA_HOME}/jre/lib/server -Wl,-rpath ${NXT_JAVA_HOME}/jre/lib/server -ljvm"
+
+    nxt_feature="JNI"
+    nxt_feature_name=""
+    nxt_feature_run=no
+    nxt_feature_incs="${NXT_JAVA_INCLUDE}"
+    nxt_feature_libs="${NXT_JAVA_LDFLAGS}"
+    nxt_feature_test="
+        #include <jni.h>
+
+        int main() {
+            JNI_CreateJavaVM(NULL, NULL, NULL);
+            return 0;
+        }"
+
+    . auto/feature
+
+fi
+
+if [ $nxt_found = no ]; then
+    $echo
+    $echo $0: error: no JDK found.
+    $echo
+    exit 1;
+fi
+
+NXT_JAVA_VERSION=`${NXT_JAVA_HOME}/bin/javac -version 2>&1`
+NXT_JAVA_VERSION=${NXT_JAVA_VERSION#javac }
+NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -DNXT_JAVA_VERSION=$NXT_JAVA_VERSION"
+
+if grep ^$NXT_JAVA_MODULE: $NXT_MAKEFILE 2>&1 > /dev/null; then
+    $echo
+    $echo $0: error: duplicate \"$NXT_JAVA_MODULE\" module configured.
+    $echo
+    exit 1;
+fi
+
+NXT_JAVA_JARS=$NXT_BUILD_DIR/nxt_java_jars.h
+
+cat << END > $NXT_JAVA_JARS
+#ifndef _NXT_JAVA_JARS_INCLUDED_
+#define _NXT_JAVA_JARS_INCLUDED_
+
+static const char *nxt_java_jars[] = {
+    "nginx-unit.jar",
+END
+
+mkdir -p "$NXT_BUILD_DIR/java"
+
+NXT_JAVA_BUILD_CP=$NXT_BUILD_DIR/java
+NXT_JAVA_INSTALL_JARS=$NXT_BUILD_DIR/nginx-unit.jar
+NXT_JAVA_UNINSTALL_JARS="\$(DESTDIR)$NXT_MODULES/nginx-unit.jar"
+
+NXT_JAR_REPO=http://central.maven.org/maven2/
+
+# NXT_SERVLET_API_VER=3.0.1
+NXT_SERVLET_API_VER=3.1.0
+
+NXT_JAR_NAME=javax.servlet-api
+NXT_JAR_VERSION=$NXT_SERVLET_API_VER
+NXT_JAR_NAMESPACE=javax/servlet/
+. auto/modules/java_get_jar
+
+
+NXT_JAR_VERSION=9.4.12.v20180830
+NXT_JAR_NAMESPACE=org/eclipse/jetty/
+
+NXT_JAR_NAME=jetty-util
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=jetty-server
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=jetty-http
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=spring-boot-loader
+NXT_JAR_VERSION=2.0.5.RELEASE
+NXT_JAR_NAMESPACE=org/springframework/boot/
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=classgraph
+NXT_JAR_VERSION=4.2.6
+NXT_JAR_NAMESPACE=io/github/classgraph/
+. auto/modules/java_get_jar
+
+cat << END >> $NXT_JAVA_JARS
+    NULL
+};
+
+#endif /* _NXT_JAVA_JARS_INCLUDED_ */
+END
+
+NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -DNXT_SERVLET_API_VER=$NXT_SERVLET_API_VER"
+
+$echo " + Java module: ${NXT_JAVA_MODULE}.unit.so"
+
+. auto/cc/deps
+
+$echo >> $NXT_MAKEFILE
+
+NXT_JAVA_MODULE_SRCS=" \
+    src/nxt_java.c \
+    src/java/nxt_jni.c \
+    src/java/nxt_jni_Context.c \
+    src/java/nxt_jni_Request.c \
+    src/java/nxt_jni_Response.c \
+    src/java/nxt_jni_InputStream.c \
+    src/java/nxt_jni_OutputStream.c \
+    src/java/nxt_jni_HeadersEnumeration.c \
+    src/java/nxt_jni_HeaderNamesEnumeration.c \
+"
+
+# The Java module object files.
+
+nxt_objs=$NXT_BUILD_DIR/src/nxt_unit.o
+
+for nxt_src in $NXT_JAVA_MODULE_SRCS; do
+
+    nxt_obj=${nxt_src%.c}-$NXT_JAVA_MODULE.o
+    nxt_dep=${nxt_src%.c}-$NXT_JAVA_MODULE.dep
+    nxt_dep_flags=`nxt_gen_dep_flags`
+    nxt_dep_post=`nxt_gen_dep_post`
+    nxt_objs="$nxt_objs $NXT_BUILD_DIR/$nxt_obj"
+
+    cat << END >> $NXT_MAKEFILE
+
+$NXT_BUILD_DIR/$nxt_obj:	$nxt_src
+	mkdir -p $NXT_BUILD_DIR/src/java
+	\$(CC) -c \$(CFLAGS) \$(NXT_INCS) $NXT_JAVA_INCLUDE \\
+	$nxt_dep_flags \\
+	-o $NXT_BUILD_DIR/$nxt_obj $nxt_src
+	$nxt_dep_post
+
+-include $NXT_BUILD_DIR/$nxt_dep
+
+END
+
+done
+
+ 
+cat << END >> $NXT_MAKEFILE
+
+.PHONY: ${NXT_JAVA_MODULE}
+.PHONY: ${NXT_JAVA_MODULE}-install
+.PHONY: ${NXT_JAVA_MODULE}-uninstall
+
+all: ${NXT_JAVA_MODULE}
+
+${NXT_JAVA_MODULE}: $NXT_BUILD_DIR/${NXT_JAVA_MODULE}.unit.so $NXT_BUILD_DIR/nginx-unit.jar
+
+$NXT_BUILD_DIR/${NXT_JAVA_MODULE}.unit.so:	$nxt_objs
+	\$(NXT_MODULE_LINK) -o $NXT_BUILD_DIR/${NXT_JAVA_MODULE}.unit.so \\
+	$nxt_objs $NXT_JAVA_LDFLAGS $NXT_LD_OPT
+
+NXT_JAVA_CLASSES = \\
+    $NXT_BUILD_DIR/java/nginx/unit/Context.class \\
+    $NXT_BUILD_DIR/java/nginx/unit/HeaderNamesEnumeration.class \\
+    $NXT_BUILD_DIR/java/nginx/unit/HeadersEnumeration.class \\
+    $NXT_BUILD_DIR/java/nginx/unit/InputStream.class \\
+    $NXT_BUILD_DIR/java/nginx/unit/OutputStream.class \\
+    $NXT_BUILD_DIR/java/nginx/unit/Request.class \\
+    $NXT_BUILD_DIR/java/nginx/unit/Response.class \\
+
+\$(NXT_JAVA_CLASSES): $NXT_BUILD_DIR/java/.classes
+
+.INTERMEDIATE: $NXT_BUILD_DIR/java/.classes
+
+$NXT_BUILD_DIR/java/.classes: \$(patsubst $NXT_BUILD_DIR/java/%, src/java/%, \$(NXT_JAVA_CLASSES:.class=.java) )
+	$NXT_JAVA_HOME/bin/javac -d $NXT_BUILD_DIR/java -cp $NXT_JAVA_BUILD_CP \$^
+
+$NXT_BUILD_DIR/nginx-unit.jar: \$(NXT_JAVA_CLASSES)
+	$NXT_JAVA_HOME/bin/jar c -C $NXT_BUILD_DIR/java nginx/unit > \$@
+
+
+install: ${NXT_JAVA_MODULE}-install
+
+${NXT_JAVA_MODULE}-install: ${NXT_JAVA_MODULE}
+	install -d \$(DESTDIR)$NXT_MODULES
+	install -p $NXT_BUILD_DIR/${NXT_JAVA_MODULE}.unit.so \\
+		$NXT_JAVA_INSTALL_JARS \\
+		\$(DESTDIR)$NXT_MODULES/
+
+
+uninstall: ${NXT_JAVA_MODULE}-uninstall
+
+${NXT_JAVA_MODULE}-uninstall:
+	rm -f \$(DESTDIR)$NXT_MODULES/${NXT_JAVA_MODULE}.unit.so \\
+		$NXT_JAVA_UNINSTALL_JARS \\
+	@rmdir -p \$(DESTDIR)$NXT_MODULES 2>/dev/null || true
+
+END
