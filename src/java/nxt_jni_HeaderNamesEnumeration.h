@@ -11,7 +11,7 @@
 #include <nxt_unit_typedefs.h>
 
 
-int nxt_java_initHeaderNamesEnumeration(JNIEnv *env);
+int nxt_java_initHeaderNamesEnumeration(JNIEnv *env, jobject cl);
 
 jobject nxt_java_newHeaderNamesEnumeration(JNIEnv *env, nxt_unit_field_t *f,
     uint32_t fields_count);

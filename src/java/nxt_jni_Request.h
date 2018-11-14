@@ -11,8 +11,8 @@
 #include <nxt_unit_typedefs.h>
 
 
-int nxt_java_initRequest(JNIEnv *env);
+int nxt_java_initRequest(JNIEnv *env, jobject cl);
 
-jobject nxt_java_newRequest(JNIEnv *env, nxt_unit_request_info_t *req);
+jobject nxt_java_newRequest(JNIEnv *env, jobject ctx, nxt_unit_request_info_t *req);
 
 #endif  /* _NXT_JAVA_REQUEST_H_INCLUDED_ */

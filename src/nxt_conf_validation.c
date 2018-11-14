@@ -76,6 +76,8 @@ static nxt_int_t nxt_conf_vldt_argument(nxt_conf_validation_t *vldt,
     nxt_conf_value_t *value);
 static nxt_int_t nxt_conf_vldt_php_option(nxt_conf_validation_t *vldt,
     nxt_str_t *name, nxt_conf_value_t *value);
+static nxt_int_t nxt_conf_vldt_java_classpath(nxt_conf_validation_t *vldt,
+    nxt_conf_value_t *value);
 static nxt_int_t nxt_conf_vldt_java_option(nxt_conf_validation_t *vldt,
     nxt_conf_value_t *value);
 
@@ -360,14 +362,9 @@ static nxt_conf_vldt_object_t  nxt_conf_vldt_ruby_members[] = {
 
 static nxt_conf_vldt_object_t  nxt_conf_vldt_java_members[] = {
     { nxt_string("classpath"),
-      NXT_CONF_VLDT_STRING,
-      NULL,
-      NULL },
-
-    { nxt_string("servlet"),
-      NXT_CONF_VLDT_STRING,
-      NULL,
-      NULL },
+      NXT_CONF_VLDT_ARRAY,
+      &nxt_conf_vldt_array_iterator,
+      (void *) &nxt_conf_vldt_java_classpath},
 
     { nxt_string("webapp"),
       NXT_CONF_VLDT_STRING,
@@ -997,6 +994,26 @@ nxt_conf_vldt_php_option(nxt_conf_validation_t *vldt, nxt_str_t *name,
     return NXT_OK;
 }
 
+
+static nxt_int_t
+nxt_conf_vldt_java_classpath(nxt_conf_validation_t *vldt, nxt_conf_value_t *value)
+{
+    nxt_str_t  str;
+
+    if (nxt_conf_type(value) != NXT_CONF_STRING) {
+        return nxt_conf_vldt_error(vldt, "The \"classpath\" array "
+                                   "must contain only string values.");
+    }
+
+    nxt_conf_get_string(value, &str);
+
+    if (nxt_memchr(str.start, '\0', str.length) != NULL) {
+        return nxt_conf_vldt_error(vldt, "The \"classpath\" array must not "
+                                   "contain strings with null character.");
+    }
+
+    return NXT_OK;
+}
 
 static nxt_int_t
 nxt_conf_vldt_java_option(nxt_conf_validation_t *vldt, nxt_conf_value_t *value)

@@ -11,6 +11,7 @@
 #include <stdio.h>
 
 #include "nxt_jni.h"
+#include "nxt_jni_URLClassLoader.h"
 #include "nxt_jni_HeadersEnumeration.h"
 
 
@@ -26,12 +27,12 @@ static jstring JNICALL nxt_java_HeadersEnumeration_nextElement(JNIEnv *env,
 
 
 int
-nxt_java_initHeadersEnumeration(JNIEnv *env)
+nxt_java_initHeadersEnumeration(JNIEnv *env, jobject cl)
 {
     int     res;
     jclass  cls;
 
-    cls = (*env)->FindClass(env, "nginx/unit/HeadersEnumeration");
+    cls = nxt_java_loadClass(env, cl, "nginx.unit.HeadersEnumeration");
     if (cls == NULL) {
         return NXT_UNIT_ERROR;
     }

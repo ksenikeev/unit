@@ -10,12 +10,14 @@
 #include <jni.h>
 
 
-int nxt_java_initContext(JNIEnv *env);
+int nxt_java_initContext(JNIEnv *env, jobject cl);
 
-void nxt_java_startContext(JNIEnv *env, const char *webapp,
-    const char *servlet);
+jobject nxt_java_startContext(JNIEnv *env, const char *webapp,
+    int classpath_count, char **classpath_arr);
 
-void nxt_java_service(JNIEnv *env, jobject jreq, jobject jresp);
+void nxt_java_service(JNIEnv *env, jobject ctx, jobject jreq, jobject jresp);
+
+void nxt_java_stopContext(JNIEnv *env, jobject ctx);
 
 #endif  /* _NXT_JAVA_CONTEXT_H_INCLUDED_ */
 

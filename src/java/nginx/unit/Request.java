@@ -48,10 +48,11 @@ import org.eclipse.jetty.util.UrlEncoded;
 import org.eclipse.jetty.server.CookieCutter;
 import org.eclipse.jetty.http.MimeTypes;
 
-public class Request implements HttpServletRequest {
-
-    private long req_info_ptr;
-    private long req_ptr;
+public class Request implements HttpServletRequest, DynamicPathRequest
+{
+    private final Context context;
+    private final long req_info_ptr;
+    private final long req_ptr;
 
     protected String authType = null;
 
@@ -63,7 +64,12 @@ public class Request implements HttpServletRequest {
 
     private MultiMap<String> parameters = null;
 
-    private String forward_uri = null;
+    private String context_path = "";
+    private String servlet_path = "";
+    private String path_info = "";
+    private String request_uri = null;
+
+    private DispatcherType dispatcher_type = DispatcherType.REQUEST;
 
     private String characterEncoding = null;
 
@@ -82,14 +88,15 @@ public class Request implements HttpServletRequest {
     private InputStream inputStream = null;
     private BufferedReader reader = null;
 
-    public Request(long req_info, long req) {
+    public Request(Context ctx, long req_info, long req) {
+        context = ctx;
         req_info_ptr = req_info;
         req_ptr = req;
     }
 
     @Override
     public boolean authenticate(HttpServletResponse response)
-                     throws IOException, ServletException
+        throws IOException, ServletException
     {
         log("authenticate");
 
@@ -111,9 +118,14 @@ public class Request implements HttpServletRequest {
     @Override
     public String getContextPath()
     {
-        log("getContextPath");
+        trace("getContextPath");
 
-        return "";
+        return context_path;
+    }
+
+    public void setContextPath(String path)
+    {
+        context_path = path;
     }
 
     @Override
@@ -254,30 +266,19 @@ public class Request implements HttpServletRequest {
     @Override
     public String getPathInfo()
     {
-        log("getPathInfo");
+        trace("getPathInfo");
 
-        if (forward_uri != null) {
-            return forward_uri;
-        }
+        return path_info;
+    }
 
-        return getPathInfo(req_ptr);
+    @Override
+    public void setPathInfo(String path)
+    {
+        path_info = path;
     }
 
     private static native String getPathInfo(long req_ptr);
 
-
-    public void set_forward_uri(String uri)
-    {
-        log("set_forward_uri(" + uri + ")");
-
-        if (uri != null && !uri.startsWith("/")) {
-            String path = getPathInfo();
-            int spos = path.lastIndexOf('/');
-            uri = path.substring(0, spos + 1) + uri;
-        }
-
-        forward_uri = uri;
-    }
 
     @Override
     public String getPathTranslated()
@@ -320,41 +321,47 @@ public class Request implements HttpServletRequest {
     @Override
     public String getRequestURI()
     {
-        log("getRequestURI");
+        trace("getRequestURI");
 
-        if (forward_uri != null) {
-            return forward_uri;
+        if (request_uri == null) {
+            request_uri = getRequestURI(req_ptr);
         }
 
-        return getRequestURI(req_ptr);
+        return request_uri;
     }
 
     private static native String getRequestURI(long req_ptr);
 
 
     @Override
+    public void setRequestURI(String uri)
+    {
+        request_uri = uri;
+    }
+
+
+    @Override
     public StringBuffer getRequestURL()
     {
-        log("getRequestURL");
+        trace("getRequestURL");
 
-        /* TODO */
-        return null;
+        String host = getHeader("Host");
+        String uri = getRequestURI();
+        return new StringBuffer("http://" + host + uri);
     }
 
     @Override
     public String getServletPath()
     {
-/*
-        if (forward_uri != null) {
-            log("getServletPath: " + forward_uri);
-            return forward_uri;
-        }
-*/
-        log("getServletPath");
+        trace("getServletPath");
 
-        // same as SCRIPT_NAME
-        /* TODO */
-        return "";
+        return servlet_path;
+    }
+
+    @Override
+    public void setServletPath(String path)
+    {
+        servlet_path = path;
     }
 
     @Override
@@ -504,8 +511,9 @@ public class Request implements HttpServletRequest {
         if (characterEncoding == null && content_type != null) {
             MimeTypes.Type mime = MimeTypes.CACHE.get(content_type);
             String charset = (mime == null || mime.getCharset() == null) ? MimeTypes.getCharsetFromContentType(content_type) : mime.getCharset().toString();
-            if (charset != null)
+            if (charset != null) {
                 characterEncoding = charset;
+            }
         }
 
         return content_type;
@@ -519,7 +527,13 @@ public class Request implements HttpServletRequest {
     {
         log("getDispatcherType");
 
-        return null;
+        return dispatcher_type;
+    }
+
+    @Override
+    public void setDispatcherType(DispatcherType type)
+    {
+        dispatcher_type = type;
     }
 
     @Override
@@ -710,9 +724,9 @@ public class Request implements HttpServletRequest {
     @Override
     public RequestDispatcher getRequestDispatcher(String path)
     {
-        log("getRequestDispatcher: " + path);
+        trace("getRequestDispatcher: " + path);
 
-        return Context.getContext().getRequestDispatcher(path);
+        return context.getRequestDispatcher(path);
     }
 
 
@@ -753,7 +767,7 @@ public class Request implements HttpServletRequest {
     {
         trace("getServletContext");
 
-        return Context.getContext();
+        return context;
     }
 
     @Override

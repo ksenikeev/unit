@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "nxt_jni_InputStream.h"
+#include "nxt_jni_URLClassLoader.h"
 
 
 static jclass nxt_java_InputStream_class;
@@ -34,12 +35,12 @@ static jint JNICALL nxt_java_InputStream_available(JNIEnv *env, jclass cls,
 
 
 int
-nxt_java_initInputStream(JNIEnv *env)
+nxt_java_initInputStream(JNIEnv *env, jobject cl)
 {
     int     res;
     jclass  cls;
 
-    cls = (*env)->FindClass(env, "nginx/unit/InputStream");
+    cls = nxt_java_loadClass(env, cl, "nginx.unit.InputStream");
     if (cls == NULL) {
         return NXT_UNIT_ERROR;
     }

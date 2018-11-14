@@ -72,8 +72,7 @@ typedef struct {
 
 
 typedef struct {
-    nxt_str_t                  classpath;
-    char                       *servlet;
+    nxt_conf_value_t           *classpath;
     char                       *webapp;
     nxt_conf_value_t           *options;
 } nxt_java_app_conf_t;

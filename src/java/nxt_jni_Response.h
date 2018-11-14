@@ -11,7 +11,7 @@
 #include <nxt_unit_typedefs.h>
 
 
-int nxt_java_initResponse(JNIEnv *env);
+int nxt_java_initResponse(JNIEnv *env, jobject cl);
 
 jobject nxt_java_newResponse(JNIEnv *env, nxt_unit_request_info_t *req,
     jobject jreq);

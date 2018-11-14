@@ -219,13 +219,8 @@ static nxt_conf_map_t  nxt_ruby_app_conf[] = {
 static nxt_conf_map_t  nxt_java_app_conf[] = {
     {
         nxt_string("classpath"),
-        NXT_CONF_MAP_STR,
+        NXT_CONF_MAP_PTR,
         offsetof(nxt_common_app_conf_t, u.java.classpath),
-    },
-    {
-        nxt_string("servlet"),
-        NXT_CONF_MAP_CSTRZ,
-        offsetof(nxt_common_app_conf_t, u.java.servlet),
     },
     {
         nxt_string("webapp"),

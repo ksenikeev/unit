@@ -9,10 +9,12 @@
 #include <jni.h>
 
 #include "nxt_jni_Context.h"
+#include "nxt_jni_URLClassLoader.h"
 
 static jclass     nxt_java_Context_class;
 static jmethodID  nxt_java_Context_start;
 static jmethodID  nxt_java_Context_service;
+static jmethodID  nxt_java_Context_stop;
 
 static void JNICALL nxt_java_Context_log(JNIEnv *env, jclass cls,
     jlong ctx_ptr, jstring msg, jint msg_len);
@@ -21,12 +23,12 @@ static void JNICALL nxt_java_Context_trace(JNIEnv *env, jclass cls,
     jlong ctx_ptr, jstring msg, jint msg_len);
 
 int
-nxt_java_initContext(JNIEnv *env)
+nxt_java_initContext(JNIEnv *env, jobject cl)
 {
     int     res;
     jclass  cls;
 
-    cls = (*env)->FindClass(env, "nginx/unit/Context");
+    cls = nxt_java_loadClass(env, cl, "nginx.unit.Context");
     if (cls == NULL) {
         nxt_unit_warn(NULL, "nginx.unit.Context not found");
         return NXT_UNIT_ERROR;
@@ -37,16 +39,22 @@ nxt_java_initContext(JNIEnv *env)
     cls = nxt_java_Context_class;
 
     nxt_java_Context_start = (*env)->GetStaticMethodID(env, cls, "start",
-                                    "(Ljava/lang/String;Ljava/lang/String;)V");
+                     "(Ljava/lang/String;[Ljava/net/URL;)Lnginx/unit/Context;");
     if (nxt_java_Context_start == NULL) {
         nxt_unit_warn(NULL, "nginx.unit.Context.start() not found");
         goto failed;
     }
 
-    nxt_java_Context_service = (*env)->GetStaticMethodID(env, cls, "service",
-            "(Ljavax/servlet/ServletRequest;Ljavax/servlet/ServletResponse;)V");
+    nxt_java_Context_service = (*env)->GetMethodID(env, cls, "service",
+            "(Lnginx/unit/Request;Ljavax/servlet/ServletResponse;)V");
     if (nxt_java_Context_service == NULL) {
         nxt_unit_warn(NULL, "nginx.unit.Context.service() not found");
+        goto failed;
+    }
+
+    nxt_java_Context_stop = (*env)->GetMethodID(env, cls, "stop", "()V");
+    if (nxt_java_Context_service == NULL) {
+        nxt_unit_warn(NULL, "nginx.unit.Context.stop() not found");
         goto failed;
     }
 
@@ -80,24 +88,35 @@ failed:
     return NXT_UNIT_ERROR;
 }
 
-void
-nxt_java_startContext(JNIEnv *env, const char *webapp, const char *servlet)
+jobject
+nxt_java_startContext(JNIEnv *env, const char *webapp, int classpath_count,
+                      char **classpath_arr)
 {
-    jstring  webapp_str, servlet_str;
+    jstring webapp_str = (*env)->NewStringUTF(env, webapp);
+    if (webapp_str == NULL) {
+        return NULL;
+    }
 
-    webapp_str = webapp ? (*env)->NewStringUTF(env, webapp) : NULL;
-    servlet_str = servlet ? (*env)->NewStringUTF(env, servlet) : NULL;
+    jobjectArray jcps = nxt_java_newURls(env, classpath_count, classpath_arr);
+    if (jcps == NULL) {
+        return NULL;
+    }
 
-    (*env)->CallStaticVoidMethod(env, nxt_java_Context_class,
-                                 nxt_java_Context_start, webapp_str,
-                                 servlet_str);
+    return (*env)->CallStaticObjectMethod(env, nxt_java_Context_class,
+                                          nxt_java_Context_start, webapp_str,
+                                          jcps);
 }
 
 void
-nxt_java_service(JNIEnv *env, jobject jreq, jobject jresp)
+nxt_java_service(JNIEnv *env, jobject ctx, jobject jreq, jobject jresp)
 {
-    (*env)->CallStaticVoidMethod(env, nxt_java_Context_class,
-                                 nxt_java_Context_service, jreq, jresp);
+    (*env)->CallVoidMethod(env, ctx, nxt_java_Context_service, jreq, jresp);
+}
+
+void
+nxt_java_stopContext(JNIEnv *env, jobject ctx)
+{
+    (*env)->CallVoidMethod(env, ctx, nxt_java_Context_stop);
 }
 
 static void JNICALL

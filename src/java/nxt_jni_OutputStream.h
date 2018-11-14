@@ -10,7 +10,7 @@
 #include <jni.h>
 
 
-int nxt_java_initOutputStream(JNIEnv *env);
+int nxt_java_initOutputStream(JNIEnv *env, jobject cl);
 
 int nxt_java_OutputStream_flush_buf(JNIEnv *env, nxt_unit_request_info_t *req);
 

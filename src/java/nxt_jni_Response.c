@@ -15,6 +15,7 @@
 #include "nxt_jni_HeadersEnumeration.h"
 #include "nxt_jni_HeaderNamesEnumeration.h"
 #include "nxt_jni_OutputStream.h"
+#include "nxt_jni_URLClassLoader.h"
 
 
 static jclass     nxt_java_Response_class;
@@ -99,12 +100,12 @@ static void JNICALL nxt_java_Response_trace(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jstring msg, jint msg_len);
 
 int
-nxt_java_initResponse(JNIEnv *env)
+nxt_java_initResponse(JNIEnv *env, jobject cl)
 {
     int     res;
     jclass  cls;
 
-    cls = (*env)->FindClass(env, "nginx/unit/Response");
+    cls = nxt_java_loadClass(env, cl, "nginx.unit.Response");
     if (cls == NULL) {
         return NXT_UNIT_ERROR;
     }

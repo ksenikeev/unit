@@ -13,6 +13,7 @@
 
 #include "nxt_jni.h"
 #include "nxt_jni_Request.h"
+#include "nxt_jni_URLClassLoader.h"
 #include "nxt_jni_HeadersEnumeration.h"
 #include "nxt_jni_HeaderNamesEnumeration.h"
 
@@ -89,12 +90,12 @@ static void JNICALL nxt_java_Request_trace(JNIEnv *env, jclass cls,
 
 
 int
-nxt_java_initRequest(JNIEnv *env)
+nxt_java_initRequest(JNIEnv *env, jobject cl)
 {
     int     res;
     jclass  cls;
 
-    cls = (*env)->FindClass(env, "nginx/unit/Request");
+    cls = nxt_java_loadClass(env, cl, "nginx.unit.Request");
     if (cls == NULL) {
         return NXT_UNIT_ERROR;
     }
@@ -103,7 +104,7 @@ nxt_java_initRequest(JNIEnv *env)
     (*env)->DeleteLocalRef(env, cls);
     cls = nxt_java_Request_class;
 
-    nxt_java_Request_ctor = (*env)->GetMethodID(env, cls, "<init>", "(JJ)V");
+    nxt_java_Request_ctor = (*env)->GetMethodID(env, cls, "<init>", "(Lnginx/unit/Context;JJ)V");
     if (nxt_java_Request_ctor == NULL) {
         (*env)->DeleteGlobalRef(env, cls);
         return NXT_UNIT_ERROR;
@@ -211,12 +212,12 @@ nxt_java_initRequest(JNIEnv *env)
         goto failed;
     }
 
-    res = nxt_java_initHeadersEnumeration(env);
+    res = nxt_java_initHeadersEnumeration(env, cl);
     if (res != NXT_UNIT_OK) {
         goto failed;
     }
 
-    res = nxt_java_initHeaderNamesEnumeration(env);
+    res = nxt_java_initHeaderNamesEnumeration(env, cl);
     if (res != NXT_UNIT_OK) {
         goto failed;
     }
@@ -231,10 +232,10 @@ failed:
 
 
 jobject
-nxt_java_newRequest(JNIEnv *env, nxt_unit_request_info_t *req)
+nxt_java_newRequest(JNIEnv *env, jobject ctx, nxt_unit_request_info_t *req)
 {
     return (*env)->NewObject(env, nxt_java_Request_class,
-        nxt_java_Request_ctor, (jlong) req, (jlong) req->request);
+        nxt_java_Request_ctor, ctx, (jlong) req, (jlong) req->request);
 }
 
 
@@ -377,9 +378,8 @@ nxt_java_Request_getQueryString(JNIEnv *env, jclass cls, jlong req_ptr)
 
     r = (nxt_unit_request_t *) req_ptr;
 
-    query = nxt_unit_sptr_get(&r->query);
-
-    if (query != NULL) {
+    if (r->query.offset != 0) {
+        query = nxt_unit_sptr_get(&r->query);
         return (*env)->NewStringUTF(env, query);
     }
 
@@ -391,24 +391,18 @@ static jstring JNICALL
 nxt_java_Request_getRequestURI(JNIEnv *env, jclass cls, jlong req_ptr)
 {
     char                *target, *query;
-    jstring             res;
     nxt_unit_request_t  *r;
 
     r = (nxt_unit_request_t *) req_ptr;
 
     target = nxt_unit_sptr_get(&r->target);
-    query = nxt_unit_sptr_get(&r->query);
 
-    if (query != NULL && query[-1] == '?') {
-        query[-1] = '\0';
-        res = (*env)->NewStringUTF(env, target);
-        query[-1] = '?';
-
-    } else {
-        res = (*env)->NewStringUTF(env, target);
+    if (r->query.offset != 0) {
+        query = nxt_unit_sptr_get(&r->query);
+        return nxt_java_newString(env, target, query - target);
     }
 
-    return res;
+    return (*env)->NewStringUTF(env, target);
 }
 
 

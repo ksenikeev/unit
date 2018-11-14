@@ -10,6 +10,7 @@
 
 #include "nxt_jni.h"
 #include "nxt_jni_OutputStream.h"
+#include "nxt_jni_URLClassLoader.h"
 
 
 static jclass nxt_java_OutputStream_class;
@@ -31,12 +32,12 @@ static void JNICALL nxt_java_OutputStream_close(JNIEnv *env, jclass cls,
 
 
 int
-nxt_java_initOutputStream(JNIEnv *env)
+nxt_java_initOutputStream(JNIEnv *env, jobject cl)
 {
     int     res;
     jclass  cls;
 
-    cls = (*env)->FindClass(env, "nginx/unit/OutputStream");
+    cls = nxt_java_loadClass(env, cl, "nginx.unit.OutputStream");
     if (cls == NULL) {
         return NXT_UNIT_ERROR;
     }
