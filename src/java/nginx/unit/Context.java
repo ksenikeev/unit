@@ -10,6 +10,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 
 import java.lang.ClassLoader;
 import java.lang.ClassNotFoundException;
@@ -66,6 +67,7 @@ import javax.servlet.ServletContextAttributeListener;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.ServletException;
+import javax.servlet.ServletOutputStream;
 import javax.servlet.ServletRegistration;
 import javax.servlet.ServletResponse;
 import javax.servlet.ServletRequest;
@@ -81,6 +83,7 @@ import javax.servlet.annotation.WebFilter;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSessionAttributeListener;
 import javax.servlet.http.HttpSessionIdListener;
 import javax.servlet.http.HttpSessionListener;
@@ -111,6 +114,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     private boolean metadata_complete_ = false;
 
     private ClassLoader loader_;
+    private File webapp_;
     private File extracted_dir_;
 
     private final Map<String, String> init_params_ = new HashMap<String, String>();
@@ -125,6 +129,10 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     private final List<PrefixPattern> prefix_patterns_ = new ArrayList<>();
     private final Map<String, ServletReg> suffix2servlet_ = new HashMap<>();
     private ServletReg default_servlet_;
+    private ServletReg system_default_servlet_ = new ServletReg("default",
+        new StaticServlet());
+
+    private final List<String> welcome_files_ = new ArrayList<>();
 
     public static final Class<?>[] SERVLET_LISTENER_TYPES = new Class[] {
         ServletContextListener.class,
@@ -168,6 +176,71 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         }
     }
 
+    private class StaticServlet extends HttpServlet
+    {
+        @Override
+        public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException
+        {
+            String path = request.getServletPath();
+
+            if (path.startsWith("/")) {
+                path = path.substring(1);
+            }
+
+            File f = new File(webapp_, path);
+            if (!f.exists()) {
+                response.sendError(response.SC_NOT_FOUND);
+                return;
+            }
+
+            long ims = request.getDateHeader("If-Modified-Since");
+            long lm = f.lastModified();
+
+            if (lm < ims) {
+                response.sendError(response.SC_NOT_MODIFIED);
+                return;
+            }
+
+            response.setDateHeader("Last-Modified", f.lastModified());
+
+            if (f.isDirectory()) {
+                String url = request.getRequestURL().toString();
+                if (!url.endsWith("/")) {
+                    response.setHeader("Location", url + "/");
+                    response.sendError(response.SC_SEE_OTHER);
+                    return;
+                }
+
+                String[] ls = f.list();
+
+                PrintWriter writer = response.getWriter();
+
+                for (String n : ls) {
+                    writer.println("<a href=\"" + n + "\">" + n + "</a><br>"); 
+                }
+
+                writer.close();
+
+            } else {
+                response.setContentLengthLong(f.length());
+
+                InputStream is = new FileInputStream(f);
+                byte[] buffer = new byte[response.getBufferSize()];
+                ServletOutputStream os = response.getOutputStream();
+                while (true) {
+                    int read = is.read(buffer);
+                    if (read == -1) {
+                        break;
+                    }
+                    os.write(buffer, 0, read);
+                }
+
+                os.close();
+            }
+        }
+    }
+
     public static Context start(String webapp, URL[] classpaths) throws Exception
     {
         Context ctx = new Context();
@@ -204,6 +277,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
             root = extractWar(root);
             extracted_dir_ = root;
         }
+
+        webapp_ = root;
 
         File web_inf_classes = new File(root, WEB_INF_CLASSES);
         if (web_inf_classes.exists() && web_inf_classes.isDirectory()) {
@@ -263,6 +338,9 @@ public class Context extends AttributesMap implements ServletContext, InitParams
 
         } finally {
             Thread.currentThread().setContextClassLoader(old);
+
+            parseURLPattern("/WEB-INF/*", null);
+            parseURLPattern("/META-INF/*", null);
 
             Collections.sort(prefix_patterns_, Collections.reverseOrder());
         }
@@ -410,7 +488,42 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         }
 
         trace("findServlet: '" + path + "' no servlet found");
-        return null;
+
+        File dir = new File(webapp_, path.substring(1));
+        if (!dir.exists()) {
+            return null;
+        }
+
+        if (!dir.isDirectory() || !path.endsWith("/")) {
+            trace("findServlet: '" + path + "' matched system default servlet");
+            if (req != null) {
+                req.setServletPath(path);
+                req.setPathInfo(null);
+            }
+            return system_default_servlet_;
+        }
+
+        for (String wf : welcome_files_) {
+            File f = new File(dir, wf);
+            if (!f.exists()) {
+                continue;
+            }
+
+            trace("findServlet: '" + path + "' found welcome file '" + wf
+                  + "' system default servlet");
+            if (req != null) {
+                req.setServletPath(path + wf);
+                req.setPathInfo(null);
+            }
+            return system_default_servlet_;
+        }
+
+        trace("findServlet: '" + path + "' fallback to system default servlet");
+        if (req != null) {
+            req.setServletPath(path);
+            req.setPathInfo(null);
+        }
+        return system_default_servlet_;
     }
 
     public void service(Request req, ServletResponse resp)
@@ -480,14 +593,24 @@ public class Context extends AttributesMap implements ServletContext, InitParams
             metadata_complete_ = true;
         }
 
+        NodeList welcome_file_lists = doc_elem.getElementsByTagName("welcome-file-list");
+        for (int i = 0; i < welcome_file_lists.getLength(); i++) {
+            Element list_el = (Element) welcome_file_lists.item(i);
+            NodeList files = list_el.getElementsByTagName("welcome-file");
+            for (int j = 0; j < files.getLength(); j++) {
+                Node node = files.item(j);
+                welcome_files_.add(node.getTextContent());
+            }
+        }
+
         NodeList context_params = doc_elem.getElementsByTagName("context-param");
-        for(int i = 0; i < context_params.getLength(); i++) {
+        for (int i = 0; i < context_params.getLength(); i++) {
             processXmlInitParam(this, (Element) context_params.item(i));
         }
 
         NodeList filters = doc_elem.getElementsByTagName("filter");
 
-        for(int i = 0; i < filters.getLength(); i++) {
+        for (int i = 0; i < filters.getLength(); i++) {
             Element filter_el = (Element) filters.item(i);
             NodeList names = filter_el.getElementsByTagName("filter-name");
             if (names == null || names.getLength() != 1) {
@@ -1137,41 +1260,6 @@ public class Context extends AttributesMap implements ServletContext, InitParams
             return Collections.emptySet();
         }
 
-        public void parseURLPattern(String p, ServletReg servlet)
-            throws IllegalArgumentException
-        {
-            if (p == "/") {
-                trace("parseURLPattern: '" + p + "' is a default");
-                default_servlet_ = servlet;
-                return;
-            }
-
-            if (p == "") {
-                trace("parseURLPattern: '" + p + "' is a root");
-                exact2servlet_.put("/", servlet);
-                return;
-            }
-
-            if (p.endsWith("/*") && p.startsWith("/")) {
-                trace("parseURLPattern: '" + p + "' is a prefix pattern");
-                p = p.substring(0, p.length() - 2);
-                prefix_patterns_.add(new PrefixPattern(p, servlet));
-                return;
-            }
-
-            if (p.startsWith("*.")) {
-                trace("parseURLPattern: '" + p + "' is a suffix pattern");
-                p = p.substring(1, p.length());
-                suffix2servlet_.put(p, servlet);
-                return;
-            }
-
-            trace("parseURLPattern: '" + p + "' is an exact pattern");
-            exact2servlet_.put(p, servlet);
-
-            /* TODO process other cases, throw IllegalArgumentException */
-        }
-
         @Override
         public Collection<String> getMappings()
         {
@@ -1231,6 +1319,41 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         {
             return (ServletContext) Context.this;
         }
+    }
+
+    public void parseURLPattern(String p, ServletReg servlet)
+        throws IllegalArgumentException
+    {
+        if (p == "/") {
+            trace("parseURLPattern: '" + p + "' is a default");
+            default_servlet_ = servlet;
+            return;
+        }
+
+        if (p == "") {
+            trace("parseURLPattern: '" + p + "' is a root");
+            exact2servlet_.put("/", servlet);
+            return;
+        }
+
+        if (p.endsWith("/*") && p.startsWith("/")) {
+            trace("parseURLPattern: '" + p + "' is a prefix pattern");
+            p = p.substring(0, p.length() - 2);
+            prefix_patterns_.add(new PrefixPattern(p, servlet));
+            return;
+        }
+
+        if (p.startsWith("*.")) {
+            trace("parseURLPattern: '" + p + "' is a suffix pattern");
+            p = p.substring(1, p.length());
+            suffix2servlet_.put(p, servlet);
+            return;
+        }
+
+        trace("parseURLPattern: '" + p + "' is an exact pattern");
+        exact2servlet_.put(p, servlet);
+
+        /* TODO process other cases, throw IllegalArgumentException */
     }
 
     private class FilterReg extends NamedReg
