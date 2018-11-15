@@ -78,7 +78,7 @@ ServerResponse.prototype.setHeader = function setHeader(key, value) {
 
     this.removeHeader(key);
 
-    this.headers[key] = value + "";
+    this.headers[key] = value;
     this.headers_len += header_len + (header_key_len * header_count);
     this.headers_count += header_count;
 };
@@ -227,7 +227,7 @@ ServerResponse.prototype._writeBody = function(chunk, encoding, callback) {
 ServerResponse.prototype.write = function write(chunk, encoding, callback) {
     this._writeBody(chunk, encoding, callback);
 
-    return this;
+    return true;
 };
 
 ServerResponse.prototype.end = function end(chunk, encoding, callback) {
@@ -333,6 +333,8 @@ Server.prototype.run_events = function (server, req, res) {
         });
 
         Promise.resolve().then(() => {
+            req.emit("finish");
+
             if (res.finished) {
                 unit_lib.unit_response_end(res);
             }

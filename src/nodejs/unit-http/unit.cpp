@@ -14,6 +14,12 @@
 napi_ref Unit::constructor_;
 
 
+struct nxt_nodejs_ctx_t {
+    nxt_unit_port_id_t  port_id;
+    uv_poll_t           poll;
+};
+
+
 Unit::Unit(napi_env env):
     env_(env),
     wrapper_(nullptr),
@@ -111,6 +117,7 @@ napi_value
 Unit::create(napi_env env, napi_callback_info info)
 {
     Unit         *obj;
+    napi_ref     ref;
     napi_value   target, cons, instance, jsthis;
     napi_status  status;
 
@@ -135,6 +142,11 @@ Unit::create(napi_env env, napi_callback_info info)
             goto failed;
         }
 
+        status = napi_create_reference(env, jsthis, 1, &ref);
+        if (status != napi_ok) {
+            goto failed;
+        }
+
         return jsthis;
     }
 
@@ -145,6 +157,11 @@ Unit::create(napi_env env, napi_callback_info info)
     }
 
     status = napi_new_instance(env, cons, 0, nullptr, &instance);
+    if (status != napi_ok) {
+        goto failed;
+    }
+
+    status = napi_create_reference(env, instance, 1, &ref);
     if (status != napi_ok) {
         goto failed;
     }
@@ -186,6 +203,7 @@ Unit::create_server(napi_env env, napi_callback_info info)
     unit_init.callbacks.request_handler = request_handler;
     unit_init.callbacks.add_port        = add_port;
     unit_init.callbacks.remove_port     = remove_port;
+    unit_init.callbacks.quit            = quit;
 
     obj->unit_ctx_ = nxt_unit_init(&unit_init);
     if (obj->unit_ctx_ == NULL) {
@@ -344,11 +362,11 @@ nxt_uv_read_callback(uv_poll_t *handle, int status, int events)
 int
 Unit::add_port(nxt_unit_ctx_t *ctx, nxt_unit_port_t *port)
 {
-    int          err;
-    Unit         *obj;
-    uv_loop_t    *loop;
-    uv_poll_t    *uv_handle;
-    napi_status  status;
+    int               err;
+    Unit              *obj;
+    uv_loop_t         *loop;
+    napi_status       status;
+    nxt_nodejs_ctx_t  *node_ctx;
 
     if (port->in_fd != -1) {
         obj = reinterpret_cast<Unit *>(ctx->unit->data);
@@ -365,45 +383,62 @@ Unit::add_port(nxt_unit_ctx_t *ctx, nxt_unit_port_t *port)
             return NXT_UNIT_ERROR;
         }
 
-        uv_handle = new uv_poll_t;
+        node_ctx = new nxt_nodejs_ctx_t;
 
-        err = uv_poll_init(loop, uv_handle, port->in_fd);
+        err = uv_poll_init(loop, &node_ctx->poll, port->in_fd);
         if (err < 0) {
             napi_throw_error(obj->env_, NULL, "Failed to init uv.poll");
             return NXT_UNIT_ERROR;
         }
 
-        err = uv_poll_start(uv_handle, UV_READABLE, nxt_uv_read_callback);
+        err = uv_poll_start(&node_ctx->poll, UV_READABLE, nxt_uv_read_callback);
         if (err < 0) {
             napi_throw_error(obj->env_, NULL, "Failed to start uv.poll");
             return NXT_UNIT_ERROR;
         }
 
-        port->data = uv_handle;
-        uv_handle->data = ctx;
+        ctx->data = node_ctx;
+
+        node_ctx->port_id = port->id;
+        node_ctx->poll.data = ctx;
     }
 
     return nxt_unit_add_port(ctx, port);
 }
 
 
+inline bool 
+operator == (const nxt_unit_port_id_t &p1, const nxt_unit_port_id_t &p2)
+{
+    return p1.pid == p2.pid && p1.id == p2.id;
+}
+
+
 void
 Unit::remove_port(nxt_unit_ctx_t *ctx, nxt_unit_port_id_t *port_id)
 {
-    nxt_unit_port_t  *port;
+    nxt_nodejs_ctx_t  *node_ctx;
 
-    port = nxt_unit_find_port(ctx, port_id);
-    if (port == NULL) {
-        return;
-    }
+    if (ctx->data != NULL) {
+        node_ctx = (nxt_nodejs_ctx_t *) ctx->data;
 
-    if (port->in_fd != -1 && port->data != NULL) {
-        uv_poll_stop((uv_poll_t *) port->data);
+        if (node_ctx->port_id == *port_id) {
+            uv_poll_stop(&node_ctx->poll);
 
-        delete (uv_poll_t *) port->data;
+            delete node_ctx;
+
+            ctx->data = NULL;
+        }
     }
 
     nxt_unit_remove_port(ctx, port_id);
+}
+
+
+void
+Unit::quit(nxt_unit_ctx_t *ctx)
+{
+    nxt_unit_done(ctx);
 }
 
 
@@ -661,6 +696,7 @@ Unit::response_send_headers(napi_env env, napi_callback_info info)
     napi_value               this_arg, headers, keys, name, value, array_val;
     napi_value               req_num;
     napi_status              status;
+    napi_valuetype           val_type;
     nxt_unit_field_t         *f;
     nxt_unit_request_info_t  *req;
     napi_value               argv[5];
@@ -770,6 +806,18 @@ Unit::response_send_headers(napi_env env, napi_callback_info info)
                     goto failed;
                 }
 
+                napi_typeof(env, array_val, &val_type);
+                if (status != napi_ok) {
+                    goto failed;
+                }
+
+                if (val_type != napi_string) {
+                    status = napi_coerce_to_string(env, array_val, &array_val);
+                    if (status != napi_ok) {
+                        goto failed;
+                    }
+                }
+
                 status = napi_get_value_string_latin1(env, array_val, ptr,
                                                       header_len,
                                                       &value_len);
@@ -795,6 +843,18 @@ Unit::response_send_headers(napi_env env, napi_callback_info info)
             }
 
         } else {
+            napi_typeof(env, value, &val_type);
+            if (status != napi_ok) {
+                goto failed;
+            }
+
+            if (val_type != napi_string) {
+                status = napi_coerce_to_string(env, value, &value);
+                if (status != napi_ok) {
+                    goto failed;
+                }
+            }
+
             status = napi_get_value_string_latin1(env, value, ptr, header_len,
                                                   &value_len);
             if (status != napi_ok) {
