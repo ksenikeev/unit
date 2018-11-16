@@ -799,7 +799,9 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         trace("removeAttribute: " + name);
 
-        attributes.remove(name);
+        Object value = attributes.remove(name);
+
+        context.requestAttributeRemoved(this, name, value);
     }
 
     @Override
@@ -807,7 +809,13 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         trace("setAttribute: " + name + ", " + o);
 
-        attributes.put(name, o);
+        Object prev = attributes.put(name, o);
+
+        if (prev == null) {
+            context.requestAttributeAdded(this, name, o);
+        } else {
+            context.requestAttributeReplaced(this, name, prev);
+        }
     }
 
     @Override

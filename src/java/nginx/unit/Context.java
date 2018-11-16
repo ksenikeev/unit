@@ -63,6 +63,7 @@ import javax.servlet.Servlet;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContainerInitializer;
 import javax.servlet.ServletContext;
+import javax.servlet.ServletContextAttributeEvent;
 import javax.servlet.ServletContextAttributeListener;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
@@ -71,7 +72,9 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.ServletRegistration;
 import javax.servlet.ServletResponse;
 import javax.servlet.ServletRequest;
+import javax.servlet.ServletRequestAttributeEvent;
 import javax.servlet.ServletRequestAttributeListener;
+import javax.servlet.ServletRequestEvent;
 import javax.servlet.ServletRequestListener;
 import javax.servlet.ServletSecurityElement;
 import javax.servlet.SessionCookieConfig;
@@ -93,7 +96,6 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.eclipse.jetty.http.MimeTypes;
-import org.eclipse.jetty.util.AttributesMap;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -102,7 +104,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 
-public class Context extends AttributesMap implements ServletContext, InitParams
+public class Context implements ServletContext, InitParams
 {
     public final static int SERVLET_MAJOR_VERSION = 3;
     public final static int SERVLET_MINOR_VERSION = 1;
@@ -112,12 +114,14 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     private String app_version_ = "";
     private MimeTypes mime_types_;
     private boolean metadata_complete_ = false;
+    private boolean ctx_initialized_ = false;
 
     private ClassLoader loader_;
     private File webapp_;
     private File extracted_dir_;
 
-    private final Map<String, String> init_params_ = new HashMap<String, String>();
+    private final Map<String, String> init_params_ = new HashMap<>();
+    private final Map<String, Object> attributes_ = new HashMap<>();
 
     private List<FilterReg> filters_ = new ArrayList<FilterReg>();
     private final Map<String, FilterReg> name2filter_ = new HashMap<>();
@@ -141,11 +145,12 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         ServletRequestAttributeListener.class
     };
 
-    private final List<ServletContextListener> _servletContextListeners = new ArrayList<>();
-    private final List<ServletContextListener> _destroyServletContextListeners = new ArrayList<>();
-    private final List<ServletContextAttributeListener> _servletContextAttributeListeners = new ArrayList<>();
-    private final List<ServletRequestListener> _servletRequestListeners = new ArrayList<>();
-    private final List<ServletRequestAttributeListener> _servletRequestAttributeListeners = new ArrayList<>();
+    private final List<ServletContextListener> ctx_listeners_ = new ArrayList<>();
+    private final List<ServletContextListener> destroy_listeners_ = new ArrayList<>();
+    private final List<ServletContextAttributeListener> ctx_attr_listeners_ = new ArrayList<>();
+    private final List<ServletRequestListener> req_init_listeners_ = new ArrayList<>();
+    private final List<ServletRequestListener> req_destroy_listeners_ = new ArrayList<>();
+    private final List<ServletRequestAttributeListener> req_attr_listeners_ = new ArrayList<>();
 
     private static final String WEB_INF = "WEB-INF/";
     private static final String WEB_INF_CLASSES = WEB_INF + "classes/";
@@ -314,35 +319,32 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         try {
             processWebXml(root);
 
-            if (metadata_complete_) {
-                return;
+            ScanResult scan_res = null;
+
+            if (!metadata_complete_) {
+                scan_res = new ClassGraph()
+                    //.verbose()
+                    .overrideClassLoaders(loader_)
+                    //.ignoreParentClassLoaders()
+                    .enableClassInfo()
+                    .enableAnnotationInfo()
+                    .enableSystemPackages()
+                    //.enableAllInfo()
+                    .scan();
+
+                loadInitializers(scan_res);
             }
 
-            ScanResult scan_res = new ClassGraph()
-                //.verbose()
-                .overrideClassLoaders(loader_)
-                //.ignoreParentClassLoaders()
-                .enableClassInfo()
-                .enableAnnotationInfo()
-                .enableSystemPackages()
-                //.enableAllInfo()
-                .scan();
-
-            loadInitializers(scan_res);
-
-            if (metadata_complete_) {
-                return;
+            if (!metadata_complete_) {
+                scanClasses(scan_res);
             }
-
-            scanClasses(scan_res);
-
-        } finally {
-            Thread.currentThread().setContextClassLoader(old);
 
             parseURLPattern("/WEB-INF/*", null);
             parseURLPattern("/META-INF/*", null);
 
             Collections.sort(prefix_patterns_, Collections.reverseOrder());
+        } finally {
+            Thread.currentThread().setContextClassLoader(old);
         }
     }
 
@@ -532,7 +534,17 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         ClassLoader old = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(loader_);
 
+        ServletRequestEvent sre = null;
+
         try {
+            if (!req_init_listeners_.isEmpty()) {
+                sre = new ServletRequestEvent(this, req);
+
+                for (ServletRequestListener l : req_init_listeners_) {
+                    l.requestInitialized(sre);
+                }
+            }
+
             URI uri = new URI(req.getRequestURI());
             ServletReg servlet = findServlet(uri.getPath(), req);
 
@@ -561,7 +573,15 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 throw new ServletException(e);
             }
         } finally {
-            Thread.currentThread().setContextClassLoader(old);
+            try {
+                if (!req_destroy_listeners_.isEmpty()) {
+                    for (ServletRequestListener l : req_destroy_listeners_) {
+                        l.requestDestroyed(sre);
+                    }
+                }
+            } finally {
+                Thread.currentThread().setContextClassLoader(old);
+            }
         }
     }
 
@@ -620,7 +640,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
             NodeList files = list_el.getElementsByTagName("welcome-file");
             for (int j = 0; j < files.getLength(); j++) {
                 Node node = files.item(j);
-                welcome_files_.add(node.getTextContent());
+                welcome_files_.add(node.getTextContent().trim());
             }
         }
 
@@ -638,7 +658,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 throw new RuntimeException("Invalid web.xml: 'filter-name' tag not found");
             }
 
-            String filter_name = names.item(0).getTextContent();
+            String filter_name = names.item(0).getTextContent().trim();
             trace("filter-name=" + filter_name);
 
             FilterReg reg = new FilterReg(filter_name);
@@ -649,12 +669,13 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 String tag_name = child_node.getNodeName();
 
                 if (tag_name.equals("filter-class")) {
-                    reg.setClassName(child_node.getTextContent());
+                    reg.setClassName(child_node.getTextContent().trim());
                     continue;
                 }
 
                 if (tag_name.equals("async-supported")) {
-                    reg.setAsyncSupported(child_node.getTextContent().equals("true"));
+                    reg.setAsyncSupported(child_node.getTextContent().trim()
+                        .equals("true"));
                     continue;
                 }
 
@@ -677,7 +698,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 throw new RuntimeException("Invalid web.xml: 'filter-name' tag not found");
             }
 
-            String filter_name = names.item(0).getTextContent();
+            String filter_name = names.item(0).getTextContent().trim();
             trace("filter-name=" + filter_name);
 
             FilterReg reg = name2filter_.get(filter_name);
@@ -689,7 +710,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
             NodeList dispatchers = mapping_el.getElementsByTagName("dispatcher");
             for (int j = 0; j < dispatchers.getLength(); j++) {
                 Node child_node = dispatchers.item(j);
-                dtypes.add(DispatcherType.valueOf(child_node.getTextContent()));
+                dtypes.add(DispatcherType.valueOf(child_node.getTextContent().trim()));
             }
 
             if (dtypes.isEmpty()) {
@@ -704,12 +725,12 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 String tag_name = child_node.getNodeName();
 
                 if (tag_name.equals("url-pattern")) {
-                    reg.addMappingForUrlPatterns(dtypes, match_after, child_node.getTextContent());
+                    reg.addMappingForUrlPatterns(dtypes, match_after, child_node.getTextContent().trim());
                     continue;
                 }
 
                 if (tag_name.equals("servlet-name")) {
-                    reg.addMappingForServletNames(dtypes, match_after, child_node.getTextContent());
+                    reg.addMappingForServletNames(dtypes, match_after, child_node.getTextContent().trim());
                     continue;
                 }
             }
@@ -724,7 +745,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 throw new RuntimeException("Invalid web.xml: 'servlet-name' tag not found");
             }
 
-            String servlet_name = names.item(0).getTextContent();
+            String servlet_name = names.item(0).getTextContent().trim();
             trace("servlet-name=" + servlet_name);
 
             ServletReg reg = new ServletReg(servlet_name);
@@ -735,12 +756,13 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 String tag_name = child_node.getNodeName();
 
                 if (tag_name.equals("servlet-class")) {
-                    reg.setClassName(child_node.getTextContent());
+                    reg.setClassName(child_node.getTextContent().trim());
                     continue;
                 }
 
                 if (tag_name.equals("async-supported")) {
-                    reg.setAsyncSupported(child_node.getTextContent().equals("true"));
+                    reg.setAsyncSupported(child_node.getTextContent().trim()
+                        .equals("true"));
                     continue;
                 }
 
@@ -750,7 +772,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 }
 
                 if (tag_name.equals("load-on-startup")) {
-                    reg.setLoadOnStartup(Integer.parseInt(child_node.getTextContent()));
+                    reg.setLoadOnStartup(Integer.parseInt(child_node.getTextContent().trim()));
                     continue;
                 }
             }
@@ -768,7 +790,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 throw new RuntimeException("Invalid web.xml: 'servlet-name' tag not found");
             }
 
-            String servlet_name = names.item(0).getTextContent();
+            String servlet_name = names.item(0).getTextContent().trim();
             trace("servlet-name=" + servlet_name);
 
             ServletReg reg = name2servlet_.get(servlet_name);
@@ -780,7 +802,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
             String patterns[] = new String[child_nodes.getLength()];
             for(int j = 0; j < child_nodes.getLength(); j++) {
                 Node child_node = child_nodes.item(j);
-                patterns[j] = child_node.getTextContent();
+                patterns[j] = child_node.getTextContent().trim();
             }
 
             reg.addMapping(patterns);
@@ -795,7 +817,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 throw new RuntimeException("Invalid web.xml: 'listener-class' tag not found");
             }
 
-            String class_name = classes.item(0).getTextContent();
+            String class_name = classes.item(0).getTextContent().trim();
             trace("listener-class=" + class_name);
 
             addListener(class_name);
@@ -834,7 +856,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         if (v == null || v.getLength() != 1) {
             throw new RuntimeException("Invalid web.xml: 'param-value' tag not found");
         }
-        params.setInitParameter(n.item(0).getTextContent(), v.item(0).getTextContent());
+        params.setInitParameter(n.item(0).getTextContent().trim(),
+            v.item(0).getTextContent().trim());
     }
 
     private void loadInitializers(ScanResult scan_res)
@@ -898,6 +921,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     }
 
     private void scanClasses(ScanResult scan_res)
+        throws ReflectiveOperationException
     {
         ClassInfoList filters = scan_res.getClassesImplementing(Filter.class.getName());
 
@@ -1020,14 +1044,38 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 }
 
                 trace("scanClasses: listener class: " + ci.getName());
+
+                Class<?> cls = ci.loadClass();
+                Constructor<?> ctor = cls.getConstructor();
+                EventListener listener = (EventListener) ctor.newInstance();
+
+                addListener(listener);
             }
         }
     }
 
     public void stop() throws IOException
     {
-        if (extracted_dir_ != null) {
-            removeDir(extracted_dir_);
+        ClassLoader old = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(loader_);
+
+        try {
+            for (ServletReg s : servlets_) {
+                s.destroy();
+            }
+
+            if (!destroy_listeners_.isEmpty()) {
+                ServletContextEvent event = new ServletContextEvent(this);
+                for (ServletContextListener listener : destroy_listeners_) {
+                    listener.contextDestroyed(event);
+                }
+            }
+
+            if (extracted_dir_ != null) {
+                removeDir(extracted_dir_);
+            }
+        } finally {
+            Thread.currentThread().setContextClassLoader(old);
         }
     }
 
@@ -1217,6 +1265,13 @@ public class Context extends AttributesMap implements ServletContext, InitParams
             init();
         }
 
+        public void destroy()
+        {
+            if (initialized_) {
+                servlet_.destroy();
+            }
+        }
+
         public void setClassName(String class_name) throws IllegalStateException
         {
             if (servlet_ != null
@@ -1254,7 +1309,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         @Override
         public Set<String> addMapping(String... urlPatterns)
         {
-            // illegalStateIfContextStarted();
+            checkContextState();
+
             Set<String> clash = null;
             for (String pattern : urlPatterns) {
                 trace("ServletReg.addMapping: " + pattern);
@@ -1297,6 +1353,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         @Override
         public void setLoadOnStartup(int loadOnStartup)
         {
+            checkContextState();
+
             log("ServletReg.setLoadOnStartup: " + loadOnStartup);
             load_on_startup_ = loadOnStartup;
         }
@@ -1339,6 +1397,13 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         public ServletContext getServletContext()
         {
             return (ServletContext) Context.this;
+        }
+    }
+
+    public void checkContextState() throws IllegalStateException
+    {
+        if (ctx_initialized_) {
+            throw new IllegalStateException("Context already initialized");
         }
     }
 
@@ -1436,6 +1501,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
             EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
             String... servletNames)
         {
+            checkContextState();
+
             for (String n : servletNames) {
                 log("FilterReg.addMappingForServletNames: ... " + n);
             }
@@ -1444,6 +1511,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         @Override
         public Collection<String> getServletNameMappings()
         {
+            checkContextState();
+
             log("FilterReg.getServletNameMappings");
             return Collections.emptySet();
         }
@@ -1453,6 +1522,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
             EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
             String... urlPatterns)
         {
+            checkContextState();
+
             for (String u : urlPatterns) {
                 log("FilterReg.addMappingForUrlPatterns: ... " + u);
             }
@@ -1492,15 +1563,13 @@ public class Context extends AttributesMap implements ServletContext, InitParams
 
         try {
             // Call context listeners
-            _destroyServletContextListeners.clear();
-            if (!_servletContextListeners.isEmpty()) {
+            destroy_listeners_.clear();
+            if (!ctx_listeners_.isEmpty()) {
                 ServletContextEvent event = new ServletContextEvent(this);
-                for (ServletContextListener listener : _servletContextListeners)
+                for (ServletContextListener listener : ctx_listeners_)
                 {
-                    trace("call contextInitialized");
                     listener.contextInitialized(event);
-                    trace("call contextInitialized done");
-                    _destroyServletContextListeners.add(listener);
+                    destroy_listeners_.add(listener);
                 }
             }
 
@@ -1519,6 +1588,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                     System.err.println("initialized: exception caught: " + e.toString());
                 }
             }
+
+            ctx_initialized_ = true;
         } finally {
             Thread.currentThread().setContextClassLoader(old);
         }
@@ -1785,21 +1856,59 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     public Object getAttribute(String name)
     {
         trace("getAttribute " + name);
-        return super.getAttribute(name);
+
+        return attributes_.get(name);
+    }
+
+    @Override
+    public Enumeration<String> getAttributeNames()
+    {
+        trace("getAttributeNames");
+
+        Set<String> names = attributes_.keySet();
+        return Collections.enumeration(names);
     }
 
     @Override
     public void setAttribute(String name, Object object)
     {
         trace("setAttribute " + name);
-        super.setAttribute(name, object);
+
+        Object prev = attributes_.put(name, object);
+
+        if (ctx_attr_listeners_.isEmpty()) {
+            return;
+        }
+
+        ServletContextAttributeEvent scae = new ServletContextAttributeEvent(
+            this, name, prev == null ? object : prev);
+
+        for (ServletContextAttributeListener l : ctx_attr_listeners_) {
+            if (prev == null) {
+                l.attributeAdded(scae);
+            } else {
+                l.attributeReplaced(scae);
+            }
+        }
     }
 
     @Override
     public void removeAttribute(String name)
     {
         trace("removeAttribute " + name);
-        super.removeAttribute(name);
+
+        Object value = attributes_.remove(name);
+
+        if (ctx_attr_listeners_.isEmpty()) {
+            return;
+        }
+
+        ServletContextAttributeEvent scae = new ServletContextAttributeEvent(
+            this, name, value);
+
+        for (ServletContextAttributeListener l : ctx_attr_listeners_) {
+            l.attributeRemoved(scae);
+        }
     }
 
     @Override
@@ -1807,6 +1916,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         Class<? extends Filter> filterClass)
     {
         log("addFilter<C> " + name + ", " + filterClass.getName());
+
+        checkContextState();
 
         FilterReg reg = new FilterReg(name, filterClass);
         filters_.add(reg);
@@ -1819,6 +1930,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     {
         log("addFilter<F> " + name);
 
+        checkContextState();
+
         FilterReg reg = new FilterReg(name, filter);
         filters_.add(reg);
         name2filter_.put(name, reg);
@@ -1829,6 +1942,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     public FilterRegistration.Dynamic addFilter(String name, String className)
     {
         log("addFilter<N> " + name + ", " + className);
+
+        checkContextState();
 
         FilterReg reg = new FilterReg(name, className);
         filters_.add(reg);
@@ -1841,6 +1956,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         Class<? extends Servlet> servletClass)
     {
         log("addServlet<C> " + name + ", " + servletClass.getName());
+
+        checkContextState();
 
         ServletReg reg = null;
         try {
@@ -1859,6 +1976,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     {
         log("addServlet<S> " + name);
 
+        checkContextState();
+
         ServletReg reg = null;
         try {
             reg = new ServletReg(name, servlet);
@@ -1875,6 +1994,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     public ServletRegistration.Dynamic addServlet(String name, String className)
     {
         log("addServlet<N> " + name + ", " + className);
+
+        checkContextState();
 
         ServletReg reg = null;
         try {
@@ -1893,6 +2014,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     {
         log("createFilter<C> " + c.getName());
 
+        checkContextState();
+
         try {
             Constructor<T> ctor = c.getConstructor();
             T filter = ctor.newInstance();
@@ -1908,6 +2031,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     public <T extends Servlet> T createServlet(Class<T> c) throws ServletException
     {
         log("createServlet<C> " + c.getName());
+
+        checkContextState();
 
         try {
             Constructor<T> ctor = c.getConstructor();
@@ -1982,6 +2107,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     {
         log("addListener<N> " + className);
 
+        checkContextState();
+
         try {
             Class<?> cls = loader_.loadClass(className);
 
@@ -1999,6 +2126,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     {
         log("addListener<T> " + t.getClass().getName());
 
+        checkContextState();
+
         for (int i = 0; i < SERVLET_LISTENER_TYPES.length; i++) {
             Class<?> c = SERVLET_LISTENER_TYPES[i];
             if (c.isAssignableFrom(t.getClass())) {
@@ -2007,7 +2136,20 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         }
 
         if (t instanceof ServletContextListener) {
-            _servletContextListeners.add((ServletContextListener) t);
+            ctx_listeners_.add((ServletContextListener) t);
+        }
+
+        if (t instanceof ServletContextAttributeListener) {
+            ctx_attr_listeners_.add((ServletContextAttributeListener) t);
+        }
+
+        if (t instanceof ServletRequestListener) {
+            req_init_listeners_.add((ServletRequestListener) t);
+            req_destroy_listeners_.add(0, (ServletRequestListener) t);
+        }
+
+        if (t instanceof ServletRequestAttributeListener) {
+            req_attr_listeners_.add((ServletRequestAttributeListener) t);
         }
     }
 
@@ -2015,6 +2157,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     public void addListener(Class<? extends EventListener> listenerClass)
     {
         log("addListener<C> " + listenerClass.getName());
+
+        checkContextState();
 
         try {
             Constructor<?> ctor = listenerClass.getConstructor();
@@ -2031,6 +2175,8 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         throws ServletException
     {
         log("createListener<C> " + clazz.getName());
+
+        checkContextState();
 
         try
         {
@@ -2083,5 +2229,47 @@ public class Context extends AttributesMap implements ServletContext, InitParams
     {
         log("getVirtualServerName");
         return null;
+    }
+
+    public void requestAttributeAdded(Request r, String name, Object value)
+    {
+        if (req_attr_listeners_.isEmpty()) {
+            return;
+        }
+
+        ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
+            this, r, name, value);
+
+        for (ServletRequestAttributeListener l : req_attr_listeners_) {
+            l.attributeAdded(srae);
+        }
+    }
+
+    public void requestAttributeReplaced(Request r, String name, Object value)
+    {
+        if (req_attr_listeners_.isEmpty()) {
+            return;
+        }
+
+        ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
+            this, r, name, value);
+
+        for (ServletRequestAttributeListener l : req_attr_listeners_) {
+            l.attributeReplaced(srae);
+        }
+    }
+
+    public void requestAttributeRemoved(Request r, String name, Object value)
+    {
+        if (req_attr_listeners_.isEmpty()) {
+            return;
+        }
+
+        ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
+            this, r, name, value);
+
+        for (ServletRequestAttributeListener l : req_attr_listeners_) {
+            l.attributeRemoved(srae);
+        }
     }
 }
