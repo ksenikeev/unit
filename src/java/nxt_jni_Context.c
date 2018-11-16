@@ -46,7 +46,7 @@ nxt_java_initContext(JNIEnv *env, jobject cl)
     }
 
     nxt_java_Context_service = (*env)->GetMethodID(env, cls, "service",
-            "(Lnginx/unit/Request;Ljavax/servlet/ServletResponse;)V");
+            "(Lnginx/unit/Request;Lnginx/unit/Response;)V");
     if (nxt_java_Context_service == NULL) {
         nxt_unit_warn(NULL, "nginx.unit.Context.service() not found");
         goto failed;

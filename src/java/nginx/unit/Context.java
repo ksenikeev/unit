@@ -526,7 +526,7 @@ public class Context extends AttributesMap implements ServletContext, InitParams
         return system_default_servlet_;
     }
 
-    public void service(Request req, ServletResponse resp)
+    public void service(Request req, Response resp)
         throws ServletException, IOException
     {
         ClassLoader old = Thread.currentThread().getContextClassLoader();
@@ -534,11 +534,32 @@ public class Context extends AttributesMap implements ServletContext, InitParams
 
         try {
             URI uri = new URI(req.getRequestURI());
-            FilterChain fc = new CtxFilterChain(findServlet(uri.getPath(), req));
+            ServletReg servlet = findServlet(uri.getPath(), req);
+
+            if (servlet == null) {
+                resp.sendError(resp.SC_NOT_FOUND);
+                return;
+            }
+
+            FilterChain fc = new CtxFilterChain(servlet);
 
             fc.doFilter(req, resp);
-        } catch (URISyntaxException e) {
-            throw new ServletException(e);
+        } catch (Exception e) {
+            try {
+                if (!resp.isCommitted()) {
+                    resp.reset();
+                    resp.setStatus(resp.SC_INTERNAL_SERVER_ERROR);
+                    resp.setContentType("text/plain");
+
+                    PrintWriter w = resp.getWriter();
+                    w.println("Unhandled exception: " + e);
+                    e.printStackTrace(w);
+
+                    w.close();
+                }
+            } finally {
+                throw new ServletException(e);
+            }
         } finally {
             Thread.currentThread().setContextClassLoader(old);
         }
@@ -1563,7 +1584,14 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 r.setDispatcherType(DispatcherType.FORWARD);
 
                 ServletReg servlet = findServlet(uri.getPath(), r);
-                servlet.service(r, response);
+
+                if (servlet == null) {
+                    Response resp = (Response) response;
+                    resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+
+                } else {
+                    servlet.service(r, response);
+                }
 
                 r.setServletPath(servlet_path);
                 r.setPathInfo(path_info);
@@ -1592,7 +1620,15 @@ public class Context extends AttributesMap implements ServletContext, InitParams
                 uri = uri.resolve(uri_);
 
                 ServletReg servlet = findServlet(uri.getPath());
-                servlet.service(r, response);
+
+                if (servlet == null) {
+                    Response resp = (Response) response;
+                    resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+
+                } else {
+                    servlet.service(r, response);
+                }
+
 
                 r.setDispatcherType(dtype);
 
