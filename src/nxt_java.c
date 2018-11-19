@@ -26,12 +26,16 @@
 
 #include "nxt_java_jars.h"
 
+static nxt_int_t nxt_java_pre_init(nxt_task_t *task,
+    nxt_common_app_conf_t *conf);
 static nxt_int_t nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf);
 static void nxt_java_request_handler(nxt_unit_request_info_t *req);
 
 static uint32_t  compat[] = {
     NXT_VERNUM, NXT_DEBUG,
 };
+
+char  *nxt_java_modules;
 
 
 #define STR1(x)  #x
@@ -42,6 +46,7 @@ NXT_EXPORT nxt_app_module_t  nxt_app_module = {
     compat,
     nxt_string("java"),
     STR(NXT_JAVA_VERSION),
+    nxt_java_pre_init,
     nxt_java_init,
 };
 
@@ -52,10 +57,43 @@ typedef struct {
 
 
 static nxt_int_t
+nxt_java_pre_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
+{
+    char       *modules, *slash;
+    nxt_int_t  modules_len;
+
+    modules = (char *) task->thread->runtime->modules;
+
+    slash = strrchr(modules, '/');
+    if (slash != NULL) {
+        modules_len = slash - modules;
+
+        modules = malloc(modules_len + 1);
+        if (modules == NULL) {
+            return NXT_ERROR;
+        }
+
+        memcpy(modules, task->thread->runtime->modules, modules_len);
+
+    } else {
+        modules_len = nxt_strlen(modules);
+    }
+
+    nxt_java_modules = realpath(modules, NULL);
+
+    if (slash != NULL) {
+        free(modules);
+    }
+
+    return NXT_OK;
+}
+
+
+static nxt_int_t
 nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 {
     jint                 rc;
-    char                 *opt, *slash, **classpath_arr, **unit_jars;
+    char                 *opt, **classpath_arr, **unit_jars;
     JavaVM               *jvm;
     JNIEnv               *env;
     nxt_str_t            str;
@@ -63,7 +101,6 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     nxt_uint_t           i, unit_jars_count, classpath_count;
     const char           **jar;
     JavaVMOption         *jvm_opt;
-    nxt_runtime_t        *rt;
     JavaVMInitArgs       jvm_args;
     nxt_unit_ctx_t       *ctx;
     nxt_unit_init_t      java_init;
@@ -93,10 +130,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 
     jvm_args.options = jvm_opt;
 
-    rt = task->thread->runtime;
-
-    slash = strrchr(rt->modules, '/');
-    modules_len = slash == NULL ? nxt_strlen(rt->modules) : slash - rt->modules;
+    modules_len = nxt_strlen(nxt_java_modules);
 
     opt_len = nxt_length(OPT_CLASS_PATH) + 1;
 
@@ -117,7 +151,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     opt = nxt_cpymem(opt, OPT_CLASS_PATH, nxt_length(OPT_CLASS_PATH));
 
     for (jar = nxt_java_system_jars; *jar != NULL; jar++) {
-        opt = nxt_cpymem(opt, rt->modules, modules_len);
+        opt = nxt_cpymem(opt, nxt_java_modules, modules_len);
         *opt++ = '/';
         opt = nxt_cpymem(opt, *jar, nxt_strlen(*jar));
         *opt++ = ':';
@@ -152,7 +186,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         unit_jars[i++] = opt;
 
         opt = nxt_cpymem(opt, "file:", nxt_length("file:"));
-        opt = nxt_cpymem(opt, rt->modules, modules_len);
+        opt = nxt_cpymem(opt, nxt_java_modules, modules_len);
         *opt++ = '/';
         opt = nxt_cpymem(opt, *jar, nxt_strlen(*jar));
         *opt++ = '\0';

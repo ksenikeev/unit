@@ -161,6 +161,8 @@ struct nxt_app_module_s {
     nxt_str_t                  type;
     const char                 *version;
 
+    nxt_int_t                  (*pre_init)(nxt_task_t *task,
+                                    nxt_common_app_conf_t *conf);
     nxt_int_t                  (*init)(nxt_task_t *task,
                                     nxt_common_app_conf_t *conf);
 };
