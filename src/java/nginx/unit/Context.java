@@ -473,32 +473,68 @@ public class Context implements ServletContext, InitParams
         }
         path = path.substring(context_path_.length());
 
+        /*
+            12.1 Use of URL Paths
+            ...
+            1. The container will try to find an exact match of the path of the
+               request to the path of the servlet. A successful match selects
+               the servlet.
+         */
         ServletReg servlet = exact2servlet_.get(path);
         if (servlet != null) {
             trace("findServlet: '" + path + "' matched exact pattern");
             if (req != null) {
-                req.setServletPath(path);
-                req.setPathInfo(null);
+                req.setServletPath(path, null);
             }
             return servlet;
         }
 
+        /*
+            2. The container will recursively try to match the longest
+               path-prefix. This is done by stepping down the path tree a
+               directory at a time, using the ’/’ character as a path separator.
+               The longest match determines the servlet selected.
+         */
         for (PrefixPattern p : prefix_patterns_) {
             if (p.match(path)) {
                 trace("findServlet: '" + path + "' matched prefix pattern '" + p.pattern + "'");
                 if (req != null) {
-                    req.setServletPath(p.pattern);
-                    req.setPathInfo(path.substring(p.pattern.length(), path.length()));
+                    req.setServletPath(p.pattern,
+                        path.substring(p.pattern.length()));
                 }
                 return p.servlet;
             }
         }
 
+        /*
+            3. If the last segment in the URL path contains an extension
+               (e.g. .jsp), the servlet container will try to match a servlet
+               that handles requests for the extension. An extension is defined
+               as the part of the last segment after the last ’.’ character.
+         */
+        int suffix_start = path.lastIndexOf('.');
+        if (suffix_start != -1) {
+            String suffix = path.substring(suffix_start);
+            servlet = suffix2servlet_.get(suffix);
+            if (servlet != null) {
+                trace("findServlet: '" + path + "' matched suffix pattern");
+                if (req != null) {
+                    req.setServletPath(path, null);
+                }
+                return servlet;
+            }
+        }
+
+        /*
+            4. If neither of the previous three rules result in a servlet match,
+               the container will attempt to serve content appropriate for the
+               resource requested. If a "default" servlet is defined for the
+               application, it will be used. ...
+         */
         if (default_servlet_ != null) {
             trace("findServlet: '" + path + "' matched default servlet");
             if (req != null) {
-                req.setServletPath(path);
-                req.setPathInfo(null);
+                req.setServletPath(path, null);
             }
             return default_servlet_;
         }
@@ -513,8 +549,7 @@ public class Context implements ServletContext, InitParams
         if (!dir.isDirectory() || !path.endsWith("/")) {
             trace("findServlet: '" + path + "' matched system default servlet");
             if (req != null) {
-                req.setServletPath(path);
-                req.setPathInfo(null);
+                req.setServletPath(path, null);
             }
             return system_default_servlet_;
         }
@@ -528,16 +563,14 @@ public class Context implements ServletContext, InitParams
             trace("findServlet: '" + path + "' found welcome file '" + wf
                   + "' system default servlet");
             if (req != null) {
-                req.setServletPath(path + wf);
-                req.setPathInfo(null);
+                req.setServletPath(path + wf, null);
             }
             return system_default_servlet_;
         }
 
         trace("findServlet: '" + path + "' fallback to system default servlet");
         if (req != null) {
-            req.setServletPath(path);
-            req.setPathInfo(null);
+            req.setServletPath(path, null);
         }
         return system_default_servlet_;
     }
@@ -1429,25 +1462,23 @@ public class Context implements ServletContext, InitParams
     public void parseURLPattern(String p, ServletReg servlet)
         throws IllegalArgumentException
     {
-        if (p == "/") {
-            trace("parseURLPattern: '" + p + "' is a default");
-            default_servlet_ = servlet;
-            return;
-        }
-
-        if (p == "") {
-            trace("parseURLPattern: '" + p + "' is a root");
-            exact2servlet_.put("/", servlet);
-            return;
-        }
-
-        if (p.endsWith("/*") && p.startsWith("/")) {
+        /*
+            12.2 Specification of Mappings
+            ...
+            A string beginning with a ‘/’ character and ending with a ‘/*’
+            suffix is used for path mapping.
+         */
+        if (p.startsWith("/") && p.endsWith("/*")) {
             trace("parseURLPattern: '" + p + "' is a prefix pattern");
             p = p.substring(0, p.length() - 2);
             prefix_patterns_.add(new PrefixPattern(p, servlet));
             return;
         }
 
+        /*
+            A string beginning with a ‘*.’ prefix is used as an extension
+            mapping.
+         */
         if (p.startsWith("*.")) {
             trace("parseURLPattern: '" + p + "' is a suffix pattern");
             p = p.substring(1, p.length());
@@ -1455,6 +1486,32 @@ public class Context implements ServletContext, InitParams
             return;
         }
 
+        /*
+            The empty string ("") is a special URL pattern that exactly maps to
+            the application's context root, i.e., requests of the form
+            http://host:port/<context- root>/. In this case the path info is ’/’
+            and the servlet path and context path is empty string (““).
+         */
+        if (p == "") {
+            trace("parseURLPattern: '" + p + "' is a root");
+            exact2servlet_.put("/", servlet);
+            return;
+        }
+
+        /*
+            A string containing only the ’/’ character indicates the "default"
+            servlet of the application. In this case the servlet path is the
+            request URI minus the context path and the path info is null.
+         */
+        if (p == "/") {
+            trace("parseURLPattern: '" + p + "' is a default");
+            default_servlet_ = servlet;
+            return;
+        }
+
+        /*
+            All other strings are used for exact matches only.
+         */
         trace("parseURLPattern: '" + p + "' is an exact pattern");
         exact2servlet_.put(p, servlet);
 
@@ -1683,8 +1740,7 @@ public class Context implements ServletContext, InitParams
                     servlet.service(r, response);
                 }
 
-                r.setServletPath(servlet_path);
-                r.setPathInfo(path_info);
+                r.setServletPath(servlet_path, path_info);
                 r.setRequestURI(req_uri);
                 r.setDispatcherType(dtype);
 

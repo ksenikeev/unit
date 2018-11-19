@@ -271,12 +271,6 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         return path_info;
     }
 
-    @Override
-    public void setPathInfo(String path)
-    {
-        path_info = path;
-    }
-
     private static native String getPathInfo(long req_ptr);
 
 
@@ -359,9 +353,10 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     }
 
     @Override
-    public void setServletPath(String path)
+    public void setServletPath(String servlet_path, String path_info)
     {
-        servlet_path = path;
+        this.servlet_path = servlet_path;
+        this.path_info = path_info;
     }
 
     @Override
