@@ -538,7 +538,7 @@ class TestUnitApplicationJava(TestUnitApplicationProto):
                 script: {
                     "type": "java",
                     "processes": { "spare": 0 },
-#                    "working_directory": self.current_dir + '/go/' + script,
+                    "working_directory": self.current_dir + '/java/' + script,
                     "webapp": self.testdir + '/java'
                 }
             }
