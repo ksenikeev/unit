@@ -114,6 +114,7 @@ public class Context implements ServletContext, InitParams
     private String app_version_ = "";
     private MimeTypes mime_types_;
     private boolean metadata_complete_ = false;
+    private boolean welcome_files_list_found_ = false;
     private boolean ctx_initialized_ = false;
 
     private ClassLoader loader_;
@@ -341,6 +342,19 @@ public class Context implements ServletContext, InitParams
 
             parseURLPattern("/WEB-INF/*", null);
             parseURLPattern("/META-INF/*", null);
+
+            /*
+                8.1.6 Other annotations / conventions
+                ...
+                By default all applications will have index.htm(l) and index.jsp
+                in the list of welcome-file-list. The descriptor may to be used
+                to override these default settings.
+             */
+            if (!welcome_files_list_found_) {
+                welcome_files_.add("index.htm");
+                welcome_files_.add("index.html");
+                /* welcome_files_.add("index.jsp"); coming soon */
+            }
 
             Collections.sort(prefix_patterns_, Collections.reverseOrder());
         } finally {
@@ -635,6 +649,11 @@ public class Context implements ServletContext, InitParams
         }
 
         NodeList welcome_file_lists = doc_elem.getElementsByTagName("welcome-file-list");
+
+        if (welcome_file_lists.getLength() > 0) {
+            welcome_files_list_found_ = true;
+        }
+
         for (int i = 0; i < welcome_file_lists.getLength(); i++) {
             Element list_el = (Element) welcome_file_lists.item(i);
             NodeList files = list_el.getElementsByTagName("welcome-file");
