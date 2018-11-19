@@ -331,7 +331,7 @@ class TestUnitHTTP(TestUnit):
 
     def recvall(self, sock, buff_size=4096):
         data = b''
-        while select.select([sock], [], [], 1)[0]:
+        while select.select([sock], [], [], 5)[0]:
             try:
                 part = sock.recv(buff_size)
             except:
@@ -512,6 +512,34 @@ class TestUnitApplicationGo(TestUnitApplicationProto):
                     "processes": { "spare": 0 },
                     "working_directory": self.current_dir + '/go/' + script,
                     "executable": self.testdir + '/go/' + name
+                }
+            }
+        })
+
+class TestUnitApplicationJava(TestUnitApplicationProto):
+    def load(self, script, name='app'):
+
+        if not os.path.isdir(self.testdir + '/java/WEB-INF/classes'):
+            os.makedirs(self.testdir + '/java/WEB-INF/classes')
+
+        process = subprocess.Popen(['javac',
+            '-d', self.testdir + '/java/WEB-INF/classes',
+            '-classpath', self.pardir + '/build/javax.servlet-api-3.1.0.jar',
+            self.current_dir + '/java/' + script + '/' + name + '.java'])
+        process.communicate()
+
+        self.conf({
+            "listeners": {
+                "*:7080": {
+                    "application": script
+                }
+            },
+            "applications": {
+                script: {
+                    "type": "java",
+                    "processes": { "spare": 0 },
+#                    "working_directory": self.current_dir + '/go/' + script,
+                    "webapp": self.testdir + '/java'
                 }
             }
         })
