@@ -139,6 +139,9 @@ public class Context implements ServletContext, InitParams
 
     private final List<String> welcome_files_ = new ArrayList<>();
 
+    private final Map<String, String> exception2location_ = new HashMap<>();
+    private final Map<Integer, String> error2location_ = new HashMap<>();
+
     public static final Class<?>[] SERVLET_LISTENER_TYPES = new Class[] {
         ServletContextListener.class,
         ServletContextAttributeListener.class,
@@ -597,14 +600,25 @@ public class Context implements ServletContext, InitParams
 
             if (servlet == null) {
                 resp.sendError(resp.SC_NOT_FOUND);
-                return;
+
+            } else {
+                FilterChain fc = new CtxFilterChain(servlet);
+
+                fc.doFilter(req, resp);
             }
 
-            FilterChain fc = new CtxFilterChain(servlet);
+            Object code = req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
+            if (code != null) {
+                handleStatusCode((Integer) code, req, resp);
+            }
+        } catch (Throwable e) {
+            trace("service: caught " + e);
 
-            fc.doFilter(req, resp);
-        } catch (Exception e) {
             try {
+                if (!resp.isCommitted() && !exception2location_.isEmpty()) {
+                    handleException(e, req, resp);
+                }
+
                 if (!resp.isCommitted()) {
                     resp.reset();
                     resp.setStatus(resp.SC_INTERNAL_SERVER_ERROR);
@@ -629,6 +643,88 @@ public class Context implements ServletContext, InitParams
             } finally {
                 Thread.currentThread().setContextClassLoader(old);
             }
+        }
+    }
+
+    private void handleException(Throwable e, Request req, Response resp)
+        throws ServletException, IOException
+    {
+        String location;
+
+        Class<?> cls = e.getClass();
+        while (cls != null && !cls.equals(Throwable.class)) {
+            location = exception2location_.get(cls.getName());
+
+            if (location != null) {
+                trace("Exception " + e + " matched. Error page location: " + location);
+
+                req.setAttribute(RequestDispatcher.ERROR_EXCEPTION, e);
+                req.setAttribute(RequestDispatcher.ERROR_EXCEPTION_TYPE, e.getClass());
+                req.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
+                req.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, resp.SC_INTERNAL_SERVER_ERROR);
+
+                handleError(location, req, resp);
+
+                return;
+            }
+
+            cls = cls.getSuperclass();
+        }
+
+        if (ServletException.class.isAssignableFrom(e.getClass())) {
+            ServletException se = (ServletException) e;
+
+            handleException(se.getRootCause(), req, resp);
+        }
+    }
+
+    private void handleStatusCode(int code, Request req, Response resp)
+        throws ServletException, IOException
+    {
+        String location;
+
+        location = error2location_.get(code);
+
+        if (location != null) {
+            trace("Status " + code + " matched. Error page location: " + location);
+
+            req.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
+
+            handleError(location, req, resp);
+        }
+    }
+
+    public void handleError(String location, Request req, Response resp)
+        throws ServletException, IOException
+    {
+        try {
+            log("handleError: " + location);
+
+            String servlet_path = req.getServletPath();
+            String path_info = req.getPathInfo();
+            String req_uri = req.getRequestURI();
+            DispatcherType dtype = req.getDispatcherType();
+
+            URI uri = new URI(req_uri);
+            uri = uri.resolve(location);
+
+            req.setRequestURI(uri.getRawPath());
+            req.setDispatcherType(DispatcherType.ERROR);
+
+            ServletReg servlet = findServlet(uri.getPath(), req);
+
+            if (servlet == null) {
+                resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+
+            } else {
+                servlet.service(req, resp);
+            }
+
+            req.setServletPath(servlet_path, path_info);
+            req.setRequestURI(req_uri);
+            req.setDispatcherType(dtype);
+        } catch (URISyntaxException e) {
+            throw new ServletException(e);
         }
     }
 
@@ -873,6 +969,40 @@ public class Context implements ServletContext, InitParams
             trace("listener-class=" + class_name);
 
             addListener(class_name);
+        }
+
+        NodeList error_pages = doc_elem.getElementsByTagName("error-page");
+
+        for (int i = 0; i < error_pages.getLength(); i++) {
+            Element error_page_el = (Element) error_pages.item(i);
+            NodeList locations = error_page_el.getElementsByTagName("location");
+            if (locations == null || locations.getLength() != 1) {
+                throw new RuntimeException("Invalid web.xml: 'location' tag not found");
+            }
+
+            String location = locations.item(0).getTextContent().trim();
+
+            NodeList child_nodes = error_page_el.getChildNodes();
+            for(int j = 0; j < child_nodes.getLength(); j++) {
+                Node child_node = child_nodes.item(j);
+                String tag_name = child_node.getNodeName();
+
+                if (tag_name.equals("exception-type")) {
+                    String ex = child_node.getTextContent().trim();
+
+                    exception2location_.put(ex, location);
+                    trace("error-page: exception " + ex + " -> " + location);
+                    continue;
+                }
+
+                if (tag_name.equals("error-code")) {
+                    Integer code = Integer.parseInt(child_node.getTextContent().trim());
+
+                    error2location_.put(code, location);
+                    trace("error-page: code " + code + " -> " + location);
+                    continue;
+                }
+            }
         }
     }
 
