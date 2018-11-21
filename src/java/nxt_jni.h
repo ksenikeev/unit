@@ -30,8 +30,12 @@ typedef struct {
     uint32_t          header_size;
     uint32_t          buf_size;
 
+    jobject           jreq;
+    jobject           jresp;
+
     nxt_unit_buf_t    *first;
     nxt_unit_buf_t    *buf;
+
 } nxt_java_request_data_t;
 
 #endif  /* _NXT_JAVA_JNI_H_INCLUDED_ */

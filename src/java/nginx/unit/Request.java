@@ -870,5 +870,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     }
 
     public static native void trace(long req_info_ptr, String msg, int msg_len);
+
+    private static native Response getResponse(long req_info_ptr);
 }
 

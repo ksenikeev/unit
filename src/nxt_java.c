@@ -391,7 +391,7 @@ nxt_java_request_handler(nxt_unit_request_info_t *req)
         return;
     }
 
-    jobject jresp = nxt_java_newResponse(env, req, jreq);
+    jobject jresp = nxt_java_newResponse(env, req);
 
     if (jresp == NULL) {
         nxt_unit_req_alert(req, "failed to create Response instance");
@@ -409,6 +409,8 @@ nxt_java_request_handler(nxt_unit_request_info_t *req)
 
     data->header_size = 10 * 1024;
     data->buf_size = 32 * 1024; /* from Jetty */
+    data->jreq = jreq;
+    data->jresp = jresp;
     data->buf = NULL;
 
     nxt_unit_request_group_dup_fields(req);

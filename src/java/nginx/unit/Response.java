@@ -30,8 +30,6 @@ public class Response implements HttpServletResponse {
 
     private long req_info_ptr;
 
-    private Request request;
-
     private String characterEncoding = "ISO-8859-1";
 
     /**
@@ -54,9 +52,8 @@ public class Response implements HttpServletResponse {
     private PrintWriter writer = null;
 
 
-    public Response(long ptr, Request req) {
+    public Response(long ptr) {
         req_info_ptr = ptr;
-        request = req;
     }
 
     /**
@@ -315,6 +312,8 @@ public class Response implements HttpServletResponse {
 
         setStatus(sc);
 
+        Request request = getRequest(req_info_ptr);
+
         // If we are allowed to have a body, then produce the error page.
         if (sc != SC_NO_CONTENT && sc != SC_NOT_MODIFIED &&
             sc != SC_PARTIAL_CONTENT && sc >= SC_OK)
@@ -334,6 +333,7 @@ public class Response implements HttpServletResponse {
         }
     }
 
+    private static native Request getRequest(long req_info_ptr);
 
     private void commit()
     {

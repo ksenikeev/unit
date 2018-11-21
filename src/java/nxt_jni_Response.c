@@ -50,6 +50,9 @@ static jobject JNICALL nxt_java_Response_getHeaders(JNIEnv *env, jclass cls,
 static jint JNICALL nxt_java_Response_getStatus(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
 
+static jobject JNICALL nxt_java_Response_getRequest(JNIEnv *env, jclass cls,
+    jlong req_info_ptr);
+
 static void JNICALL nxt_java_Response_commit(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
 
@@ -114,8 +117,7 @@ nxt_java_initResponse(JNIEnv *env, jobject cl)
     (*env)->DeleteLocalRef(env, cls);
     cls = nxt_java_Response_class;
 
-    nxt_java_Response_ctor = (*env)->GetMethodID(env, cls, "<init>",
-                                                 "(JLnginx/unit/Request;)V");
+    nxt_java_Response_ctor = (*env)->GetMethodID(env, cls, "<init>", "(J)V");
     if (nxt_java_Response_ctor == NULL) {
         (*env)->DeleteGlobalRef(env, cls);
         return NXT_UNIT_ERROR;
@@ -149,6 +151,10 @@ nxt_java_initResponse(JNIEnv *env, jobject cl)
         { (char *) "getStatus",
           (char *) "(J)I",
           nxt_java_Response_getStatus },
+
+        { (char *) "getRequest",
+          (char *) "(J)Lnginx/unit/Request;",
+          nxt_java_Response_getRequest },
 
         { (char *) "commit",
           (char *) "(J)V",
@@ -228,10 +234,10 @@ nxt_java_initResponse(JNIEnv *env, jobject cl)
 
 
 jobject
-nxt_java_newResponse(JNIEnv *env, nxt_unit_request_info_t *req, jobject jreq)
+nxt_java_newResponse(JNIEnv *env, nxt_unit_request_info_t *req)
 {
     return (*env)->NewObject(env, nxt_java_Response_class,
-                             nxt_java_Response_ctor, (jlong) req, jreq);
+                             nxt_java_Response_ctor, (jlong) req);
 }
 
 
@@ -538,6 +544,16 @@ nxt_java_Response_getStatus(JNIEnv *env, jclass cls, jlong req_info_ptr)
     }
 
     return req->response->status;
+}
+
+
+static jobject JNICALL
+nxt_java_Response_getRequest(JNIEnv *env, jclass cls, jlong req_info_ptr)
+{
+    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
+    nxt_java_request_data_t  *data = req->data;
+
+    return data->jreq;
 }
 
 

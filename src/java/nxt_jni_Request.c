@@ -88,6 +88,8 @@ static void JNICALL nxt_java_Request_log(JNIEnv *env, jclass cls,
 static void JNICALL nxt_java_Request_trace(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jstring msg, jint msg_len);
 
+static jobject JNICALL nxt_java_Request_getResponse(JNIEnv *env, jclass cls,
+    jlong req_info_ptr);
 
 int
 nxt_java_initRequest(JNIEnv *env, jobject cl)
@@ -198,6 +200,10 @@ nxt_java_initRequest(JNIEnv *env, jobject cl)
         { (char *) "trace",
           (char *) "(JLjava/lang/String;I)V",
           nxt_java_Request_trace },
+
+        { (char *) "getResponse",
+          (char *) "(J)Lnginx/unit/Response;",
+          nxt_java_Request_getResponse },
 
     };
 
@@ -613,3 +619,11 @@ nxt_java_Request_trace(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
 #endif
 }
 
+static jobject JNICALL
+nxt_java_Request_getResponse(JNIEnv *env, jclass cls, jlong req_info_ptr)
+{
+    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
+    nxt_java_request_data_t  *data = req->data;
+
+    return data->jresp;
+}

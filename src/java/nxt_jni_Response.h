@@ -13,7 +13,6 @@
 
 int nxt_java_initResponse(JNIEnv *env, jobject cl);
 
-jobject nxt_java_newResponse(JNIEnv *env, nxt_unit_request_info_t *req,
-    jobject jreq);
+jobject nxt_java_newResponse(JNIEnv *env, nxt_unit_request_info_t *req);
 
 #endif  /* _NXT_JAVA_RESPONSE_H_INCLUDED_ */
