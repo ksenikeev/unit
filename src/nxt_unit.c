@@ -1238,9 +1238,11 @@ nxt_unit_response_add_field(nxt_unit_request_info_t *req,
 
     nxt_unit_sptr_set(&f->name, buf->free);
     buf->free = nxt_cpymem(buf->free, name, name_length);
+    *buf->free++ = '\0';
 
     nxt_unit_sptr_set(&f->value, buf->free);
     buf->free = nxt_cpymem(buf->free, value, value_length);
+    *buf->free++ = '\0';
 
     f->hash = nxt_unit_field_hash(name, name_length);
     f->skip = 0;
