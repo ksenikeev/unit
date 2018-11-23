@@ -227,15 +227,15 @@ $echo >> $NXT_MAKEFILE
 NXT_JAVA_MODULE_SRCS=" \
     src/nxt_java.c \
     src/java/nxt_jni.c \
-    src/java/nxt_jni_Thread.c \
     src/java/nxt_jni_Context.c \
-    src/java/nxt_jni_Request.c \
-    src/java/nxt_jni_Response.c \
+    src/java/nxt_jni_HeaderNamesEnumeration.c \
+    src/java/nxt_jni_HeadersEnumeration.c \
     src/java/nxt_jni_InputStream.c \
     src/java/nxt_jni_OutputStream.c \
+    src/java/nxt_jni_Request.c \
+    src/java/nxt_jni_Response.c \
+    src/java/nxt_jni_Thread.c \
     src/java/nxt_jni_URLClassLoader.c \
-    src/java/nxt_jni_HeadersEnumeration.c \
-    src/java/nxt_jni_HeaderNamesEnumeration.c \
 "
 
 # The Java module object files.
