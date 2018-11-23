@@ -294,6 +294,9 @@ NXT_JAVA_CLASSES = \\
     $NXT_BUILD_DIR/java/nginx/unit/OutputStream.class \\
     $NXT_BUILD_DIR/java/nginx/unit/Request.class \\
     $NXT_BUILD_DIR/java/nginx/unit/Response.class \\
+    $NXT_BUILD_DIR/java/nginx/unit/Session.class \\
+    $NXT_BUILD_DIR/java/nginx/unit/SessionManager.class \\
+    $NXT_BUILD_DIR/java/nginx/unit/UnitSessionCookieConfig.class \\
 
 \$(NXT_JAVA_CLASSES): $NXT_BUILD_DIR/java/.classes
 
