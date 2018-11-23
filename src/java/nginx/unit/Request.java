@@ -364,7 +364,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         log("getSession");
 
-        return null;
+        // SESSION
+        HttpSession session =
+                ((Context)getServletContext()).getSessionManager().
+                        getSession(true,this, getResponse(req_info_ptr));
+        return session;
     }
 
     @Override
@@ -372,7 +376,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         log("getSession: " + create);
 
-        return null;
+        // SESSION
+        HttpSession session =
+                ((Context)getServletContext()).getSessionManager().
+                        getSession(create, this, getResponse(req_info_ptr));
+        return session;
     }
 
     @Override

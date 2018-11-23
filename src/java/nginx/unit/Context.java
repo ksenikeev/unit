@@ -164,6 +164,14 @@ public class Context implements ServletContext, InitParams
     private static final String WEB_INF_CLASSES = WEB_INF + "classes/";
     private static final String WEB_INF_LIB = WEB_INF + "lib/";
 
+    // SESSION
+    private static SessionManager sessionManager;
+    // SESSION
+    public SessionManager getSessionManager()
+    {
+        return sessionManager;
+    }
+
     private class PrefixPattern implements Comparable
     {
         public final String pattern;
@@ -257,6 +265,9 @@ public class Context implements ServletContext, InitParams
     public static Context start(String webapp, URL[] classpaths) throws Exception
     {
         Context ctx = new Context();
+
+        // SESSION
+        sessionManager = new SessionManager(ctx);
 
         ctx.loadApp(webapp, classpaths);
         ctx.initialized();
@@ -1038,6 +1049,25 @@ public class Context implements ServletContext, InitParams
                 }
             }
         }
+
+        // SESSION
+        NodeList session_config = doc_elem.getElementsByTagName("session-config");
+
+        for (int i = 0; i < session_config.getLength(); i++) {
+            Element session_config_el = (Element) session_config.item(i);
+            NodeList session_timeout = session_config_el.getElementsByTagName("session-timeout");
+            if (session_timeout != null) {
+                String timeout = session_timeout.item(0).getTextContent().trim();
+
+                trace("session_timeout: " + timeout);
+                if (sessionManager!=null){
+                    sessionManager.setSessionTimeOut(Integer.parseInt(timeout));
+                }
+                break;
+            }
+        }
+        //// SESSION
+        
     }
 
     private static int compareVersion(String ver1, String ver2)
@@ -2481,14 +2511,18 @@ public class Context implements ServletContext, InitParams
     public Set<SessionTrackingMode> getDefaultSessionTrackingModes()
     {
         log("getDefaultSessionTrackingModes");
-        return null;
+
+        // SESSION
+        return sessionManager.getDefaultSessionTrackingModes();
     }
 
     @Override
     public Set<SessionTrackingMode> getEffectiveSessionTrackingModes()
     {
         log("getEffectiveSessionTrackingModes");
-        return null;
+
+        // SESSION
+        return sessionManager.getEffectiveSessionTrackingModes();
     }
 
     @Override
@@ -2524,7 +2558,9 @@ public class Context implements ServletContext, InitParams
     {
         log("getSessionCookieConfig");
         //LOG.warn(__unimplmented);
-        return null;
+
+        // SESSION
+        return  sessionManager.getSessionCookieConfig();
     }
 
     @Override
@@ -2532,6 +2568,9 @@ public class Context implements ServletContext, InitParams
     {
         log("setSessionTrackingModes");
         //LOG.warn(__unimplmented);
+
+        // SESSION
+        sessionManager.setSessionTrackingModes(sessionTrackingModes);
     }
 
     @Override
