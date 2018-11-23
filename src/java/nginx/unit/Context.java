@@ -96,6 +96,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.eclipse.jetty.http.MimeTypes;
+import org.apache.jasper.servlet.JspServlet;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -357,6 +358,12 @@ public class Context implements ServletContext, InitParams
                 welcome_files_.add("index.htm");
                 welcome_files_.add("index.html");
                 /* welcome_files_.add("index.jsp"); coming soon */
+            }
+
+            if (pattern2servlet_.get("*.jsp") == null) {
+                ServletReg jsp_servlet = new JspServletReg();
+                servlets_.add(jsp_servlet);
+                parseURLPattern("*.jsp", jsp_servlet);
             }
 
             Collections.sort(prefix_patterns_, Collections.reverseOrder());
@@ -634,6 +641,8 @@ public class Context implements ServletContext, InitParams
                 throw new ServletException(e);
             }
         } finally {
+            resp.flushBuffer();
+
             try {
                 if (!req_destroy_listeners_.isEmpty()) {
                     for (ServletRequestListener l : req_destroy_listeners_) {
@@ -1582,6 +1591,28 @@ public class Context implements ServletContext, InitParams
         }
     }
 
+    private class JspServletReg extends ServletReg
+    {
+        public JspServletReg()
+        {
+            super("jsp", new JspServlet());
+        }
+
+        @Override
+        public void service(ServletRequest request, ServletResponse response)
+            throws ServletException, IOException
+        {
+            ClassLoader old = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+
+            try {
+                super.service(request, response);
+            } finally {
+                Thread.currentThread().setContextClassLoader(old);
+            }
+        }
+    }
+
     public void checkContextState() throws IllegalStateException
     {
         if (ctx_initialized_) {
@@ -1933,21 +1964,34 @@ public class Context implements ServletContext, InitParams
     public String getRealPath(String path)
     {
         log("getRealPath for " + path);
-        return null;
+
+        File f = new File(webapp_, path.substring(1));
+
+        return f.getAbsolutePath();
     }
 
     @Override
     public URL getResource(String path) throws MalformedURLException
     {
         log("getResource for " + path);
-        return null;
+
+        return new URL("file:" + getRealPath(path));
     }
 
     @Override
     public InputStream getResourceAsStream(String path)
     {
         log("getResourceAsStream for " + path);
-        return null;
+
+        try {
+            File f = new File(webapp_, path.substring(1));
+
+            return new FileInputStream(f);
+        } catch (FileNotFoundException e) {
+            log("getResourceAsStream: failed " + e);
+
+            return null;
+        }
     }
 
     @Override

@@ -153,6 +153,16 @@ NXT_JAR_VERSION=$NXT_SERVLET_API_VER
 NXT_JAR_NAMESPACE=javax/servlet/
 . auto/modules/java_get_jar
 
+NXT_JAR_NAME=javax.el-api
+NXT_JAR_VERSION=3.0.0
+NXT_JAR_NAMESPACE=javax/el/
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=javax.servlet.jsp-api
+NXT_JAR_VERSION=2.3.3
+NXT_JAR_NAMESPACE=javax/servlet/jsp/
+. auto/modules/java_get_jar
+
 cat << END >> $NXT_JAVA_JARS
     NULL
 };
@@ -178,6 +188,25 @@ NXT_JAR_NAME=jetty-http
 NXT_JAR_NAME=classgraph
 NXT_JAR_VERSION=4.4.11
 NXT_JAR_NAMESPACE=io/github/classgraph/
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=jasper
+NXT_JAR_VERSION=6.0.53
+NXT_JAR_NAMESPACE=org/apache/tomcat/
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=jasper-el
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=juli
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=coyote
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=ecj
+NXT_JAR_VERSION=4.3.1
+NXT_JAR_NAMESPACE=org/eclipse/jdt/core/compiler/
 . auto/modules/java_get_jar
 
 cat << END >> $NXT_JAVA_JARS
