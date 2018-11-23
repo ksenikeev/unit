@@ -11,6 +11,7 @@
 static jclass     nxt_java_URLClassLoader_class;
 static jmethodID  nxt_java_URLClassLoader_ctor;
 static jmethodID  nxt_java_URLClassLoader_loadClass;
+static jmethodID  nxt_java_URLClassLoader_addURL;
 
 static jclass     nxt_java_URL_class;
 static jmethodID  nxt_java_URL_ctor;
@@ -41,6 +42,13 @@ nxt_java_initURLClassLoader(JNIEnv *env)
         "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
     if (nxt_java_URLClassLoader_loadClass == NULL) {
         nxt_unit_warn(NULL, "java.net.URLClassLoader.loadClass not found");
+        goto failed;
+    }
+
+    nxt_java_URLClassLoader_addURL = (*env)->GetMethodID(env, cls,
+        "addURL", "(Ljava/net/URL;)V");
+    if (nxt_java_URLClassLoader_addURL == NULL) {
+        nxt_unit_warn(NULL, "java.net.URLClassLoader.addURL not found");
         goto failed;
     }
 
@@ -120,4 +128,21 @@ nxt_java_loadClass(JNIEnv *env, jobject cl, const char *name)
 
     return (*env)->CallObjectMethod(env, cl, nxt_java_URLClassLoader_loadClass,
                                     jname);
+}
+
+void
+nxt_java_addURL(JNIEnv *env, jobject cl, const char *url)
+{
+    jstring surl = (*env)->NewStringUTF(env, url);
+    if (surl == NULL) {
+        return;
+    }
+
+    jobject jurl = (*env)->NewObject(env, nxt_java_URL_class,
+                                     nxt_java_URL_ctor, surl);
+    if (jurl == NULL) {
+        return;
+    }
+
+    (*env)->CallVoidMethod(env, cl, nxt_java_URLClassLoader_addURL, jurl);
 }

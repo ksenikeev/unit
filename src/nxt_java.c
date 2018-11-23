@@ -108,12 +108,10 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     nxt_conf_value_t     *value;
     nxt_java_app_conf_t  *c;
 
-    static const char  OPT_CLASS_PATH[] = "-Djava.class.path=";
-
     //setenv("ASAN_OPTIONS", "handle_segv=0", 1);
 
     jvm_args.version = JNI_VERSION_1_6;
-    jvm_args.nOptions = 1;
+    jvm_args.nOptions = 0;
     jvm_args.ignoreUnrecognized = 0;
 
     c = &conf->u.java;
@@ -131,37 +129,6 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     jvm_args.options = jvm_opt;
 
     modules_len = nxt_strlen(nxt_java_modules);
-
-    opt_len = nxt_length(OPT_CLASS_PATH) + 1;
-
-    for (jar = nxt_java_system_jars; *jar != NULL; jar++) {
-        opt_len += modules_len + nxt_length("/") + nxt_strlen(*jar) +
-                   nxt_length(":");
-    }
-
-    opt = malloc(opt_len);
-    if (opt == NULL) {
-        nxt_alert(task, "failed to allocate buffer for classpath");
-
-        return NXT_ERROR;
-    }
-
-    jvm_opt[0].optionString = opt;
-
-    opt = nxt_cpymem(opt, OPT_CLASS_PATH, nxt_length(OPT_CLASS_PATH));
-
-    for (jar = nxt_java_system_jars; *jar != NULL; jar++) {
-        opt = nxt_cpymem(opt, nxt_java_modules, modules_len);
-        *opt++ = '/';
-        opt = nxt_cpymem(opt, *jar, nxt_strlen(*jar));
-        *opt++ = ':';
-    }
-
-    opt--; /* remove trailing semicolon (:) */
-
-    *opt++ = '\0';
-
-    nxt_debug(task, "opt[0]=%s", jvm_opt[0].optionString);
 
     unit_jars_count = sizeof(nxt_java_unit_jars) / sizeof(nxt_java_unit_jars[0])
                       - 1;
@@ -216,7 +183,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
             memcpy(opt, str.start, str.length);
             opt[str.length] = '\0';
 
-            jvm_opt[1 + i].optionString = opt;
+            jvm_opt[i].optionString = opt;
         }
     }
 
@@ -277,7 +244,39 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         goto env_failed;
     }
 
-    jobject cl = nxt_java_newURLClassLoader(env, unit_jars_count, unit_jars);
+    jobject cl = nxt_java_getContextClassLoader(env);
+    if (cl == NULL) {
+        nxt_alert(task, "nxt_java_getContextClassLoader failed");
+        goto env_failed;
+    }
+
+    for (jar = nxt_java_system_jars; *jar != NULL; jar++) {
+        opt_len = nxt_length("file:") + modules_len + nxt_length("/")
+                   + nxt_strlen(*jar) + 1;
+        opt = malloc(opt_len);
+        if (opt == NULL) {
+            nxt_alert(task, "failed to allocate buffer for system jar");
+
+            return NXT_ERROR;
+        }
+        char *url = opt;
+
+        opt = nxt_cpymem(opt, "file:", nxt_length("file:"));
+        opt = nxt_cpymem(opt, nxt_java_modules, modules_len);
+        *opt++ = '/';
+        opt = nxt_cpymem(opt, *jar, nxt_strlen(*jar));
+        *opt++ = '\0';
+
+        nxt_java_addURL(env, cl, url);
+
+        if ((*env)->ExceptionCheck(env)) {
+            (*env)->ExceptionDescribe(env);
+        }
+
+        free(url);
+    }
+
+    cl = nxt_java_newURLClassLoader(env, unit_jars_count, unit_jars);
     if (cl == NULL) {
         nxt_alert(task, "nxt_java_newURLClassLoader failed");
         goto env_failed;

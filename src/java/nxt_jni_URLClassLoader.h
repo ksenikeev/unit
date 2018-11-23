@@ -18,5 +18,7 @@ jobjectArray nxt_java_newURls(JNIEnv *env, int url_count, char **urls);
 
 jclass nxt_java_loadClass(JNIEnv *env, jobject cl, const char *name);
 
+void nxt_java_addURL(JNIEnv *env, jobject cl, const char *url);
+
 #endif  /* _NXT_JAVA_URLCLASSLOADER_H_INCLUDED_ */
 
