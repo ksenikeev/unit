@@ -125,10 +125,13 @@ public class Context implements ServletContext, InitParams
     private final Map<String, String> init_params_ = new HashMap<>();
     private final Map<String, Object> attributes_ = new HashMap<>();
 
-    private List<FilterReg> filters_ = new ArrayList<FilterReg>();
-    private final Map<String, FilterReg> name2filter_ = new HashMap<>();
+    private final Map<String, URLPattern> parsed_patterns_ = new HashMap<>();
 
-    private final List<ServletReg> servlets_ = new ArrayList<ServletReg>();
+    private final List<FilterReg> filters_ = new ArrayList<>();
+    private final Map<String, FilterReg> name2filter_ = new HashMap<>();
+    private final List<FilterMap> filter_maps_ = new ArrayList<>();
+
+    private final List<ServletReg> servlets_ = new ArrayList<>();
     private final Map<String, ServletReg> name2servlet_ = new HashMap<>();
     private final Map<String, ServletReg> pattern2servlet_ = new HashMap<>();
     private final Map<String, ServletReg> exact2servlet_ = new HashMap<>();
@@ -450,10 +453,12 @@ public class Context implements ServletContext, InitParams
     {
         private int filter_index_ = 0;
         private final ServletReg servlet_;
+        private final List<FilterReg> filters_;
 
-        CtxFilterChain(ServletReg servlet)
+        CtxFilterChain(ServletReg servlet, List<FilterReg> filters)
         {
             servlet_ = servlet;
+            filters_ = filters;
         }
 
         @Override
@@ -609,7 +614,27 @@ public class Context implements ServletContext, InitParams
                 resp.sendError(resp.SC_NOT_FOUND);
 
             } else {
-                FilterChain fc = new CtxFilterChain(servlet);
+                List<FilterReg> filters = new ArrayList<>();
+
+                for (FilterMap m : filter_maps_) {
+                    if (filters.indexOf(m.filter_) != -1) {
+                        continue;
+                    }
+
+                    if (m.pattern_.match(uri.getPath())) {
+                        filters.add(m.filter_);
+                    }
+                }
+
+                for (FilterMap m : servlet.filters_) {
+                    if (filters.indexOf(m.filter_) != -1) {
+                        continue;
+                    }
+
+                    filters.add(m.filter_);
+                }
+
+                FilterChain fc = new CtxFilterChain(servlet, filters);
 
                 fc.doFilter(req, resp);
             }
@@ -1086,8 +1111,7 @@ public class Context implements ServletContext, InitParams
                 for (ClassInfo ci : handles) {
                     if (ci.isInterface()
                         || ci.isAnnotation()
-                        || ci.isAbstract()
-                        || ci.isInnerClass())
+                        || ci.isAbstract())
                     {
                         continue;
                     }
@@ -1119,8 +1143,7 @@ public class Context implements ServletContext, InitParams
         for (ClassInfo ci : filters) {
             if (ci.isInterface()
                 || ci.isAnnotation()
-                || ci.isAbstract()
-                || ci.isInnerClass())
+                || ci.isAbstract())
             {
                 trace("scanClasses: ignoring Filter impl: " + ci.getName());
                 continue;
@@ -1128,12 +1151,18 @@ public class Context implements ServletContext, InitParams
 
             trace("scanClasses: found Filter class: " + ci.getName());
 
-            String filter_name = ci.getName();
             Class<?> cls = ci.loadClass();
             WebFilter ann = cls.getAnnotation(WebFilter.class);
 
-            if (ann != null) {
-                filter_name = ann.filterName();
+            if (ann == null) {
+                trace("scanClasses: no WebFilter annotation for " + ci.getName());
+                continue;
+            }
+
+            String filter_name = ann.filterName();
+
+            if (filter_name.isEmpty()) {
+                filter_name = ci.getName();
             }
 
             FilterReg reg = name2filter_.get(filter_name);
@@ -1144,11 +1173,6 @@ public class Context implements ServletContext, InitParams
                 name2filter_.put(filter_name, reg);
             } else {
                 reg.setClass(cls);
-            }
-
-            if (ann == null) {
-                trace("scanClasses: no WebFilter annotation");
-                continue;
             }
 
             EnumSet<DispatcherType> dtypes = EnumSet.noneOf(DispatcherType.class);
@@ -1179,8 +1203,7 @@ public class Context implements ServletContext, InitParams
         for (ClassInfo ci : servlets) {
             if (ci.isInterface()
                 || ci.isAnnotation()
-                || ci.isAbstract()
-                || ci.isInnerClass())
+                || ci.isAbstract())
             {
                 trace("scanClasses: ignoring HttpServlet subclass: " + ci.getName());
                 continue;
@@ -1188,12 +1211,18 @@ public class Context implements ServletContext, InitParams
 
             trace("scanClasses: found HttpServlet class: " + ci.getName());
 
-            String servlet_name = ci.getName();
             Class<?> cls = ci.loadClass();
             WebServlet ann = cls.getAnnotation(WebServlet.class);
 
-            if (ann != null) {
-                servlet_name = ann.name();
+            if (ann == null) {
+                trace("scanClasses: no WebServlet annotation");
+                continue;
+            }
+
+            String servlet_name = ann.name();
+
+            if (servlet_name.isEmpty()) {
+                servlet_name = ci.getName();
             }
 
             ServletReg reg = name2servlet_.get(servlet_name);
@@ -1204,11 +1233,6 @@ public class Context implements ServletContext, InitParams
                 name2servlet_.put(servlet_name, reg);
             } else {
                 reg.setClass(cls);
-            }
-
-            if (ann == null) {
-                trace("scanClasses: no WebServlet annotation");
-                continue;
             }
 
             reg.addMapping(ann.value());
@@ -1227,8 +1251,7 @@ public class Context implements ServletContext, InitParams
             for (ClassInfo ci : lstnrs) {
                 if (ci.isInterface()
                     || ci.isAnnotation()
-                    || ci.isAbstract()
-                    || ci.isInnerClass())
+                    || ci.isAbstract())
                 {
                     trace("scanClasses: listener impl: " + ci.getName());
                     continue;
@@ -1253,6 +1276,10 @@ public class Context implements ServletContext, InitParams
         try {
             for (ServletReg s : servlets_) {
                 s.destroy();
+            }
+
+            for (FilterReg f : filters_) {
+                f.destroy();
             }
 
             if (!destroy_listeners_.isEmpty()) {
@@ -1396,9 +1423,10 @@ public class Context implements ServletContext, InitParams
         private Servlet servlet_;
         private String role_;
         private boolean async_supported_ = false;
-        private final List<String> patterns_ = new ArrayList<String>();
+        private final List<String> patterns_ = new ArrayList<>();
         private int load_on_startup_ = -1;
         private boolean initialized_ = false;
+        private final List<FilterMap> filters_ = new ArrayList<>();
 
         public ServletReg(String name, Class<?> servlet_class)
         {
@@ -1495,6 +1523,11 @@ public class Context implements ServletContext, InitParams
             init();
 
             servlet_.service(request, response);
+        }
+
+        public void addFilter(FilterMap fmap)
+        {
+            filters_.add(fmap);
         }
 
         @Override
@@ -1623,60 +1656,134 @@ public class Context implements ServletContext, InitParams
     public void parseURLPattern(String p, ServletReg servlet)
         throws IllegalArgumentException
     {
-        /*
-            12.2 Specification of Mappings
-            ...
-            A string beginning with a ‘/’ character and ending with a ‘/*’
-            suffix is used for path mapping.
-         */
-        if (p.startsWith("/") && p.endsWith("/*")) {
-            trace("parseURLPattern: '" + p + "' is a prefix pattern");
-            p = p.substring(0, p.length() - 2);
-            prefix_patterns_.add(new PrefixPattern(p, servlet));
-            return;
-        }
+        URLPattern pattern = parseURLPattern(p);
 
-        /*
-            A string beginning with a ‘*.’ prefix is used as an extension
-            mapping.
-         */
-        if (p.startsWith("*.")) {
-            trace("parseURLPattern: '" + p + "' is a suffix pattern");
-            p = p.substring(1, p.length());
-            suffix2servlet_.put(p, servlet);
+        switch (pattern.type_) {
+        case PREFIX:
+            prefix_patterns_.add(new PrefixPattern(pattern.pattern_, servlet));
             return;
-        }
 
-        /*
-            The empty string ("") is a special URL pattern that exactly maps to
-            the application's context root, i.e., requests of the form
-            http://host:port/<context- root>/. In this case the path info is ’/’
-            and the servlet path and context path is empty string (““).
-         */
-        if (p == "") {
-            trace("parseURLPattern: '" + p + "' is a root");
-            exact2servlet_.put("/", servlet);
+        case SUFFIX:
+            suffix2servlet_.put(pattern.pattern_, servlet);
             return;
-        }
 
-        /*
-            A string containing only the ’/’ character indicates the "default"
-            servlet of the application. In this case the servlet path is the
-            request URI minus the context path and the path info is null.
-         */
-        if (p == "/") {
-            trace("parseURLPattern: '" + p + "' is a default");
+        case EXACT:
+            exact2servlet_.put(pattern.pattern_, servlet);
+            return;
+
+        case DEFAULT:
             default_servlet_ = servlet;
             return;
         }
 
-        /*
-            All other strings are used for exact matches only.
-         */
-        trace("parseURLPattern: '" + p + "' is an exact pattern");
-        exact2servlet_.put(p, servlet);
-
         /* TODO process other cases, throw IllegalArgumentException */
+    }
+
+    public URLPattern parseURLPattern(String p)
+        throws IllegalArgumentException
+    {
+        URLPattern pattern = parsed_patterns_.get(p);
+        if (pattern == null) {
+            pattern = new URLPattern(p);
+        }
+
+        return pattern;
+    }
+
+    private static enum URLPatternType {
+        PREFIX,
+        SUFFIX,
+        DEFAULT,
+        EXACT,
+    };
+
+    private class URLPattern
+    {
+        private final String pattern_;
+        private final URLPatternType type_;
+
+        public URLPattern(String p)
+            throws IllegalArgumentException
+        {
+            /*
+                12.2 Specification of Mappings
+                ...
+                A string beginning with a ‘/’ character and ending with a ‘/*’
+                suffix is used for path mapping.
+             */
+            if (p.startsWith("/") && p.endsWith("/*")) {
+                trace("URLPattern: '" + p + "' is a prefix pattern");
+                pattern_ = p.substring(0, p.length() - 2);
+                type_ = URLPatternType.PREFIX;
+                return;
+            }
+
+            /*
+                A string beginning with a ‘*.’ prefix is used as an extension
+                mapping.
+             */
+            if (p.startsWith("*.")) {
+                trace("URLPattern: '" + p + "' is a suffix pattern");
+                pattern_ = p.substring(1, p.length());
+                type_ = URLPatternType.SUFFIX;
+                return;
+            }
+
+            /*
+                The empty string ("") is a special URL pattern that exactly maps to
+                the application's context root, i.e., requests of the form
+                http://host:port/<context- root>/. In this case the path info is ’/’
+                and the servlet path and context path is empty string (““).
+             */
+            if (p.isEmpty()) {
+                trace("URLPattern: '" + p + "' is a root");
+                pattern_ = "/";
+                type_ = URLPatternType.EXACT;
+                return;
+            }
+
+            /*
+                A string containing only the ’/’ character indicates the "default"
+                servlet of the application. In this case the servlet path is the
+                request URI minus the context path and the path info is null.
+             */
+            if (p.equals("/")) {
+                trace("URLPattern: '" + p + "' is a default");
+                pattern_ = p;
+                type_ = URLPatternType.DEFAULT;
+                return;
+            }
+
+            /*
+                All other strings are used for exact matches only.
+             */
+            trace("URLPattern: '" + p + "' is an exact pattern");
+            pattern_ = p;
+            type_ = URLPatternType.EXACT;
+
+            /* TODO process other cases, throw IllegalArgumentException */
+        }
+
+        public boolean match(String url)
+        {
+            switch (type_) {
+            case PREFIX:
+                return url.startsWith(pattern_) && (
+                    url.length() == pattern_.length()
+                    || url.charAt(pattern_.length()) == '/');
+
+            case SUFFIX:
+                return url.endsWith(pattern_);
+
+            case EXACT:
+                return url.equals(pattern_);
+
+            case DEFAULT:
+                return true;
+            }
+
+            return false;
+        }
     }
 
     private class FilterReg extends NamedReg
@@ -1685,6 +1792,7 @@ public class Context implements ServletContext, InitParams
         private Class<?> filter_class_;
         private Filter filter_;
         private boolean async_supported_ = false;
+        private boolean initialized_ = false;
 
         public FilterReg(String name, Class<?> filter_class)
         {
@@ -1733,6 +1841,34 @@ public class Context implements ServletContext, InitParams
             filter_class_ = filter_class;
         }
 
+        public void init() throws ServletException
+        {
+            if (filter_ == null) {
+                try {
+                    if (filter_class_ == null) {
+                        filter_class_ = loader_.loadClass(getClassName());
+                    }
+
+                    Constructor<?> ctor = filter_class_.getConstructor();
+                    filter_ = (Filter) ctor.newInstance();
+                } catch(Exception e) {
+                    log("FilterReg.init() failed " + e);
+                    throw new ServletException(e);
+                }
+            }
+
+            filter_.init((FilterConfig) this);
+
+            initialized_ = true;
+        }
+
+        public void destroy()
+        {
+            if (initialized_) {
+                filter_.destroy();
+            }
+        }
+
         @Override
         public void addMappingForServletNames(
             EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
@@ -1742,6 +1878,18 @@ public class Context implements ServletContext, InitParams
 
             for (String n : servletNames) {
                 log("FilterReg.addMappingForServletNames: ... " + n);
+
+                ServletReg sreg = name2servlet_.get(n);
+                if (sreg == null) {
+                    sreg = new ServletReg(n);
+                    servlets_.add(sreg);
+                    name2servlet_.put(n, sreg);
+                }
+
+                FilterMap map = new FilterMap(this, sreg, dispatcherTypes,
+                    isMatchAfter);
+
+                sreg.addFilter(map);
             }
         }
 
@@ -1763,6 +1911,12 @@ public class Context implements ServletContext, InitParams
 
             for (String u : urlPatterns) {
                 log("FilterReg.addMappingForUrlPatterns: ... " + u);
+
+                URLPattern p = parseURLPattern(u);
+                FilterMap map = new FilterMap(this, p, dispatcherTypes,
+                    isMatchAfter);
+
+                filter_maps_.add(map);
             }
         }
 
@@ -1793,6 +1947,35 @@ public class Context implements ServletContext, InitParams
         }
     }
 
+    private class FilterMap
+    {
+        private final FilterReg filter_;
+        private final ServletReg servlet_;
+        private final URLPattern pattern_;
+        private final EnumSet<DispatcherType> dtypes_;
+        private final boolean match_after_;
+
+        public FilterMap(FilterReg filter, ServletReg servlet,
+            EnumSet<DispatcherType> dtypes, boolean match_after)
+        {
+            filter_ = filter;
+            servlet_ = servlet;
+            pattern_ = null;
+            dtypes_ = dtypes;
+            match_after_ = match_after;
+        }
+
+        public FilterMap(FilterReg filter, URLPattern pattern,
+            EnumSet<DispatcherType> dtypes, boolean match_after)
+        {
+            filter_ = filter;
+            servlet_ = null;
+            pattern_ = pattern;
+            dtypes_ = dtypes;
+            match_after_ = match_after;
+        }
+    }
+
     private void initialized()
     {
         ClassLoader old = Thread.currentThread().getContextClassLoader();
@@ -1820,7 +2003,7 @@ public class Context implements ServletContext, InitParams
 
             for (FilterReg fr : filters_) {
                 try {
-                    fr.filter_.init((FilterConfig) fr);
+                    fr.init();
                 } catch(ServletException e) {
                     System.err.println("initialized: exception caught: " + e.toString());
                 }
