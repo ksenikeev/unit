@@ -610,6 +610,18 @@ public class Request implements HttpServletRequest, DynamicPathRequest
             UrlEncoded.decodeUtf8To(query, parameters);
         }
 
+        if (getContentLength() > 0 &&
+            getMethod().equals("POST") &&
+            getContentType().startsWith("application/x-www-form-urlencoded"))
+        {
+            try {
+                UrlEncoded.decodeUtf8To(new InputStream(req_info_ptr),
+                    parameters, getContentLength(), -1);
+            } catch (IOException e) {
+                log("Unhandled IOException: " + e);
+            }
+        }
+
         return parameters;
     }
 

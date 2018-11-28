@@ -38,5 +38,28 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
 
         self.assertEqual(resp['headers']['X-Filter-After'], '0', 'filter after')
 
+    def test_java_application_get_variables(self):
+        self.load('get_params')
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/?var1=val1&var2=')
+        self.assertEqual(resp['headers']['X-Var-1'], 'val1', 'GET variables')
+        self.assertEqual(resp['headers']['X-Var-2'], 'true', 'GET variables 2')
+        self.assertEqual(resp['headers']['X-Var-3'], 'false', 'GET variables 3')
+
+    def test_java_application_post_variables(self):
+        self.load('post_params')
+
+        resp = self.post(headers={
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, body='var1=val1&var2=')
+        self.assertEqual(resp['headers']['X-Var-1'], 'val1', 'POST variables')
+        self.assertEqual(resp['headers']['X-Var-2'], 'true', 'POST variables 2')
+        self.assertEqual(resp['headers']['X-Var-3'], 'false', 'POST variables 3')
+
 if __name__ == '__main__':
     unittest.main()
