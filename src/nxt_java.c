@@ -225,6 +225,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 
     } else {
         classpath_count = 0;
+        classpath_arr = NULL;
     }
 
     rc = JNI_CreateJavaVM(&jvm, (void **) &env, &jvm_args);
