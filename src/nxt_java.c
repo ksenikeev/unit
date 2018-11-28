@@ -74,6 +74,7 @@ nxt_java_pre_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         }
 
         memcpy(modules, task->thread->runtime->modules, modules_len);
+        modules[modules_len] = '\0';
 
     } else {
         modules_len = nxt_strlen(modules);
