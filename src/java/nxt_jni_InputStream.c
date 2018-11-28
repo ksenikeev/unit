@@ -214,7 +214,7 @@ nxt_java_InputStream_skip(JNIEnv *env, jclass cls, jlong req_info_ptr, jlong n)
         buf = nxt_unit_buf_next(buf);
     }
 
-    n = n < (jlong) req->content_length ? n : req->content_length;
+    n = n < (jlong) req->content_length ? n : (jlong) req->content_length;
 
     req->content_length -= n;
 

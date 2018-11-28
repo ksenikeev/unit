@@ -19,6 +19,7 @@ for nxt_option; do
 
         --module=*)     NXT_JAVA_MODULE="$value"                              ;;
         --home=*)       NXT_JAVA_HOME="$value"                                ;;
+        --lib-path=*)   NXT_JAVA_LIB_PATH="$value"                            ;;
         --repo=*)       NXT_JAR_REPO="$value"                                 ;;
         --local-repo=*) NXT_JAR_LOCAL_REPO="$value"                           ;;
 
@@ -27,6 +28,7 @@ for nxt_option; do
 
     --module=NAME         set unit Java module name
     --home=DIR            set Java home directory
+    --lib-path=DIRECTORY  set directory path to libjvm.so library
     --repo=URL            set Maven remote repository URL ($NXT_JAR_REPO)
     --local-repo=DIR      set local repository directory ($NXT_JAR_LOCAL_REPO)
 
@@ -55,74 +57,141 @@ fi
 . $NXT_AUTOCONF_DATA
 
 NXT_JAVA_MODULE=${NXT_JAVA_MODULE=java}
+NXT_JAVA_LIB_PATH=${NXT_JAVA_LIB_PATH=}
 
 $echo "configuring Java module"
 $echo "configuring Java module ..." >> $NXT_AUTOCONF_ERR
 
-nxt_found=no
+if [ -n "${NXT_JAVA_HOME}" ]; then
+    $echo "using java.home ${NXT_JAVA_HOME}"
+    $echo "using java.home ${NXT_JAVA_HOME}" >> $NXT_AUTOCONF_ERR
 
-if [ -z "${NXT_JAVA_HOME}" ]; then
-    cat << END > $NXT_BUILD_DIR/GetHome.java
-public class GetHome {
-    public static void main(String[] args) {
-        System.out.println(System.getProperty("java.home"));
-    }
-}
-END
-
-    if /bin/sh -c "javac -d $NXT_BUILD_DIR $NXT_BUILD_DIR/GetHome.java" >> $NXT_AUTOCONF_ERR 2>&1; then
-        java_home=`java -cp $NXT_BUILD_DIR GetHome`
-        NXT_JAVA_HOME=${java_home%/jre}
-        $echo "checking for java.home ... ${java_home}"
-    else
-        $echo "checking for JDK ... not found"
+    if [ ! -d "${NXT_JAVA_HOME}" ]; then
+        $echo
+        $echo $0: error: Java home directory not found.
+        $echo
+        exit 1
     fi
 
-    rm -f $NXT_BUILD_DIR/GetHome.java $NXT_BUILD_DIR/GetHome.class
+    NXT_JAVA="${NXT_JAVA_HOME}/bin/java"
+
+else
+    $echo -n "looking for java executable"
+    $echo "looking for java executable ..." >> $NXT_AUTOCONF_ERR
+
+    NXT_JAVA=`which java`
+    if [ -z "$NXT_JAVA" -o ! -x "$NXT_JAVA" ]; then
+        $echo
+        $echo $0: error: java executable not found.
+        $echo
+        exit 1
+    fi
+
+    $echo " found $NXT_JAVA"
+    $echo "found $NXT_JAVA" >> $NXT_AUTOCONF_ERR
+
+    "$NXT_JAVA" -version
+
+    $echo -n "query java.home"
+    $echo "query java.home ..." >> $NXT_AUTOCONF_ERR
+
+    NXT_JAVA_HOME=`$NXT_JAVA -XshowSettings 2>&1 | grep -F -e java.home | sed -e 's/^.*= //'`
+    if [ -z "$NXT_JAVA_HOME" ]; then
+        $echo
+        $echo $0: error: java.home not found.
+        $echo
+        exit 1
+    fi
+
+    $echo " $NXT_JAVA_HOME"
+    $echo "got java.home $NXT_JAVA_HOME" >> $NXT_AUTOCONF_ERR
+
+    if [ ! -x "${NXT_JAVA_HOME}/bin/javac" ]; then
+        NXT_JAVA_HOME_=${NXT_JAVA_HOME%/jre}
+        if [ -x "${NXT_JAVA_HOME_}/bin/javac" ]; then
+            $echo "adjust java.home $NXT_JAVA_HOME_"
+            $echo "adjust java.home $NXT_JAVA_HOME_" >> $NXT_AUTOCONF_ERR
+
+            NXT_JAVA_HOME="$NXT_JAVA_HOME_"
+        fi
+    fi
 fi
 
-if [ -n "${NXT_JAVA_HOME}" \
-      -a -x "${NXT_JAVA_HOME}/bin/javac" \
-      -a -x "${NXT_JAVA_HOME}/bin/javah" ]; then
+NXT_JAVAC="${NXT_JAVA_HOME}/bin/javac"
 
-    NXT_JAVA_INCLUDE="-I${NXT_JAVA_HOME}/include"
-
-    case "$NXT_SYSTEM" in
-        Linux)
-            NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/linux"
-            ;;
-        Darwin)
-            NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/darwin"
-            ;;
-    esac
-
-    NXT_JAVA_LDFLAGS="-L${NXT_JAVA_HOME}/jre/lib/server -Wl,-rpath ${NXT_JAVA_HOME}/jre/lib/server -ljvm"
-
-    nxt_feature="JNI"
-    nxt_feature_name=""
-    nxt_feature_run=no
-    nxt_feature_incs="${NXT_JAVA_INCLUDE}"
-    nxt_feature_libs="${NXT_JAVA_LDFLAGS}"
-    nxt_feature_test="
-        #include <jni.h>
-
-        int main() {
-            JNI_CreateJavaVM(NULL, NULL, NULL);
-            return 0;
-        }"
-
-    . auto/feature
-
+if [ ! -x "$NXT_JAVAC" ]; then
+    $echo
+    $echo $0: error: javac not found.
+    $echo
+    exit 1
 fi
+
+NXT_JAVA_INCLUDE="-I${NXT_JAVA_HOME}/include"
+
+case "$NXT_SYSTEM" in
+    Linux)
+        NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/linux"
+        ;;
+    Darwin)
+        NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/darwin"
+        ;;
+esac
+
+if [ -z "$NXT_JAVA_LIB_PATH" ]; then
+    $echo -n "query library path"
+    $echo "query library path ..." >> $NXT_AUTOCONF_ERR
+
+    if [ ! -x "$NXT_JAVA" ]; then
+        $echo
+        $echo $0: error: java executable not found.
+        $echo
+        exit 1
+    fi
+
+    NXT_JAVA_LIB_PATH=`$NXT_JAVA -XshowSettings 2>&1 | grep -F -e sun.boot.library.path | sed -e 's/^.*= //'`
+
+    if [ -z "$NXT_JAVA_LIB_PATH" ]; then
+        $echo
+        $echo $0: error: library path not found.
+        $echo
+        exit 1
+    fi
+
+    NXT_JAVA_LIB_PATH="${NXT_JAVA_LIB_PATH}/server"
+
+    $echo " $NXT_JAVA_LIB_PATH"
+    $echo "got library path $NXT_JAVA_LIB_PATH" >> $NXT_AUTOCONF_ERR
+fi
+
+NXT_JAVA_LDFLAGS="-L${NXT_JAVA_LIB_PATH} -Wl,-rpath ${NXT_JAVA_LIB_PATH} -ljvm"
+
+
+nxt_found=no
+
+nxt_feature="JNI"
+nxt_feature_name=""
+nxt_feature_run=no
+nxt_feature_incs="${NXT_JAVA_INCLUDE}"
+nxt_feature_libs="${NXT_JAVA_LDFLAGS}"
+nxt_feature_test="
+    #include <jni.h>
+
+    int main() {
+        JNI_CreateJavaVM(NULL, NULL, NULL);
+        return 0;
+    }"
+
+. auto/feature
+
 
 if [ $nxt_found = no ]; then
     $echo
-    $echo $0: error: no JDK found.
+    $echo $0: error: no JNI found.
     $echo
     exit 1;
 fi
 
-NXT_JAVA_VERSION=`${NXT_JAVA_HOME}/bin/javac -version 2>&1`
+NXT_JAVA_VERSION=`$NXT_JAVAC -version 2>&1`
 NXT_JAVA_VERSION=${NXT_JAVA_VERSION#javac }
 NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -DNXT_JAVA_VERSION=$NXT_JAVA_VERSION"
 
@@ -149,10 +218,8 @@ cat << END > $NXT_JAVA_JARS
 static const char *nxt_java_system_jars[] = {
 END
 
-NXT_SERVLET_API_VER=3.1.0
-
 NXT_JAR_NAME=javax.servlet-api
-NXT_JAR_VERSION=$NXT_SERVLET_API_VER
+NXT_JAR_VERSION=3.1.0
 NXT_JAR_NAMESPACE=javax/servlet/
 . auto/modules/java_get_jar
 
@@ -218,8 +285,6 @@ cat << END >> $NXT_JAVA_JARS
 
 #endif /* _NXT_JAVA_JARS_INCLUDED_ */
 END
-
-NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -DNXT_SERVLET_API_VER=$NXT_SERVLET_API_VER"
 
 $echo " + Java module: ${NXT_JAVA_MODULE}.unit.so"
 
@@ -303,7 +368,7 @@ NXT_JAVA_CLASSES = \\
 .INTERMEDIATE: $NXT_BUILD_DIR/java/.classes
 
 $NXT_BUILD_DIR/java/.classes: \$(patsubst $NXT_BUILD_DIR/java/%, src/java/%, \$(NXT_JAVA_CLASSES:.class=.java) )
-	$NXT_JAVA_HOME/bin/javac -d $NXT_BUILD_DIR/java -cp $NXT_JAVA_BUILD_CP \$^
+	$NXT_JAVAC -d $NXT_BUILD_DIR/java -cp $NXT_JAVA_BUILD_CP \$^
 
 $NXT_BUILD_DIR/$NXT_UNIT_JAR: \$(NXT_JAVA_CLASSES)
 	$NXT_JAVA_HOME/bin/jar c -C $NXT_BUILD_DIR/java nginx/unit > \$@

@@ -496,7 +496,7 @@ public class Response implements HttpServletResponse {
 
             writer = new PrintWriter(
                 new OutputStreamWriter(stream, Charset.forName(characterEncoding)),
-                true);
+                false);
         }
 
         return writer;

@@ -74,6 +74,7 @@ nxt_java_pre_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         }
 
         memcpy(modules, task->thread->runtime->modules, modules_len);
+        modules[modules_len] = '\0';
 
     } else {
         modules_len = nxt_strlen(modules);
@@ -93,12 +94,12 @@ static nxt_int_t
 nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 {
     jint                 rc;
-    char                 *opt, **classpath_arr, **unit_jars;
+    char                 *opt, **classpath_arr, **unit_jars, **system_jars;
     JavaVM               *jvm;
     JNIEnv               *env;
     nxt_str_t            str;
     nxt_int_t            opt_len, modules_len;
-    nxt_uint_t           i, unit_jars_count, classpath_count;
+    nxt_uint_t           i, unit_jars_count, classpath_count, system_jars_count;
     const char           **jar;
     JavaVMOption         *jvm_opt;
     JavaVMInitArgs       jvm_args;
@@ -151,6 +152,35 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         }
 
         unit_jars[i++] = opt;
+
+        opt = nxt_cpymem(opt, "file:", nxt_length("file:"));
+        opt = nxt_cpymem(opt, nxt_java_modules, modules_len);
+        *opt++ = '/';
+        opt = nxt_cpymem(opt, *jar, nxt_strlen(*jar));
+        *opt++ = '\0';
+    }
+
+    system_jars_count = sizeof(nxt_java_system_jars) / sizeof(nxt_java_system_jars[0])
+                      - 1;
+
+    system_jars = malloc(system_jars_count * sizeof(char*));
+    if (system_jars == NULL) {
+        nxt_alert(task, "failed to allocate buffer for system_jar array");
+
+        return NXT_ERROR;
+    }
+
+    for (i = 0, jar = nxt_java_system_jars; *jar != NULL; jar++) {
+        opt_len = nxt_length("file:") + modules_len + nxt_length("/")
+                   + nxt_strlen(*jar) + 1;
+        opt = malloc(opt_len);
+        if (opt == NULL) {
+            nxt_alert(task, "failed to allocate buffer for system jar");
+
+            return NXT_ERROR;
+        }
+
+        system_jars[i++] = opt;
 
         opt = nxt_cpymem(opt, "file:", nxt_length("file:"));
         opt = nxt_cpymem(opt, nxt_java_modules, modules_len);
@@ -224,6 +254,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 
     } else {
         classpath_count = 0;
+        classpath_arr = NULL;
     }
 
     rc = JNI_CreateJavaVM(&jvm, (void **) &env, &jvm_args);
@@ -244,39 +275,15 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         goto env_failed;
     }
 
-    jobject cl = nxt_java_getContextClassLoader(env);
+    jobject cl = nxt_java_newURLClassLoader(env, system_jars_count, system_jars);
     if (cl == NULL) {
-        nxt_alert(task, "nxt_java_getContextClassLoader failed");
+        nxt_alert(task, "nxt_java_newURLClassLoader failed");
         goto env_failed;
     }
 
-    for (jar = nxt_java_system_jars; *jar != NULL; jar++) {
-        opt_len = nxt_length("file:") + modules_len + nxt_length("/")
-                   + nxt_strlen(*jar) + 1;
-        opt = malloc(opt_len);
-        if (opt == NULL) {
-            nxt_alert(task, "failed to allocate buffer for system jar");
+    nxt_java_setContextClassLoader(env, cl);
 
-            return NXT_ERROR;
-        }
-        char *url = opt;
-
-        opt = nxt_cpymem(opt, "file:", nxt_length("file:"));
-        opt = nxt_cpymem(opt, nxt_java_modules, modules_len);
-        *opt++ = '/';
-        opt = nxt_cpymem(opt, *jar, nxt_strlen(*jar));
-        *opt++ = '\0';
-
-        nxt_java_addURL(env, cl, url);
-
-        if ((*env)->ExceptionCheck(env)) {
-            (*env)->ExceptionDescribe(env);
-        }
-
-        free(url);
-    }
-
-    cl = nxt_java_newURLClassLoader(env, unit_jars_count, unit_jars);
+    cl = nxt_java_newURLClassLoader_parent(env, unit_jars_count, unit_jars, cl);
     if (cl == NULL) {
         nxt_alert(task, "nxt_java_newURLClassLoader failed");
         goto env_failed;
