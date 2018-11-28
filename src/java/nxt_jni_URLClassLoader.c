@@ -10,6 +10,7 @@
 
 static jclass     nxt_java_URLClassLoader_class;
 static jmethodID  nxt_java_URLClassLoader_ctor;
+static jmethodID  nxt_java_URLClassLoader_parent_ctor;
 static jmethodID  nxt_java_URLClassLoader_loadClass;
 static jmethodID  nxt_java_URLClassLoader_addURL;
 
@@ -33,6 +34,13 @@ nxt_java_initURLClassLoader(JNIEnv *env)
 
     nxt_java_URLClassLoader_ctor = (*env)->GetMethodID(env, cls,
         "<init>", "([Ljava/net/URL;)V");
+    if (nxt_java_URLClassLoader_ctor == NULL) {
+        nxt_unit_warn(NULL, "java.net.URLClassLoader constructor not found");
+        goto failed;
+    }
+
+    nxt_java_URLClassLoader_parent_ctor = (*env)->GetMethodID(env, cls,
+        "<init>", "([Ljava/net/URL;Ljava/lang/ClassLoader;)V");
     if (nxt_java_URLClassLoader_ctor == NULL) {
         nxt_unit_warn(NULL, "java.net.URLClassLoader constructor not found");
         goto failed;
@@ -89,6 +97,21 @@ nxt_java_newURLClassLoader(JNIEnv *env, int url_count, char **urls)
 
     return (*env)->NewObject(env, nxt_java_URLClassLoader_class,
                              nxt_java_URLClassLoader_ctor, jurls);
+}
+
+jobject
+nxt_java_newURLClassLoader_parent(JNIEnv *env, int url_count, char **urls,
+    jobject parent)
+{
+    jobjectArray jurls = nxt_java_newURls(env, url_count, urls);
+
+    if (jurls == NULL) {
+        return NULL;
+    }
+
+    return (*env)->NewObject(env, nxt_java_URLClassLoader_class,
+                             nxt_java_URLClassLoader_parent_ctor, jurls,
+                             parent);
 }
 
 jobjectArray
