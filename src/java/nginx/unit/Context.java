@@ -507,7 +507,7 @@ public class Context implements ServletContext, InitParams
         /*
             2. The container will recursively try to match the longest
                path-prefix. This is done by stepping down the path tree a
-               directory at a time, using the ’/’ character as a path separator.
+               directory at a time, using the '/' character as a path separator.
                The longest match determines the servlet selected.
          */
         for (PrefixPattern p : prefix_patterns_) {
@@ -525,7 +525,7 @@ public class Context implements ServletContext, InitParams
             3. If the last segment in the URL path contains an extension
                (e.g. .jsp), the servlet container will try to match a servlet
                that handles requests for the extension. An extension is defined
-               as the part of the last segment after the last ’.’ character.
+               as the part of the last segment after the last '.' character.
          */
         int suffix_start = path.lastIndexOf('.');
         if (suffix_start != -1) {
@@ -1708,7 +1708,7 @@ public class Context implements ServletContext, InitParams
             /*
                 12.2 Specification of Mappings
                 ...
-                A string beginning with a ‘/’ character and ending with a ‘/*’
+                A string beginning with a '/' character and ending with a '/*'
                 suffix is used for path mapping.
              */
             if (p.startsWith("/") && p.endsWith("/*")) {
@@ -1719,7 +1719,7 @@ public class Context implements ServletContext, InitParams
             }
 
             /*
-                A string beginning with a ‘*.’ prefix is used as an extension
+                A string beginning with a '*.' prefix is used as an extension
                 mapping.
              */
             if (p.startsWith("*.")) {
@@ -1732,8 +1732,8 @@ public class Context implements ServletContext, InitParams
             /*
                 The empty string ("") is a special URL pattern that exactly maps to
                 the application's context root, i.e., requests of the form
-                http://host:port/<context- root>/. In this case the path info is ’/’
-                and the servlet path and context path is empty string (““).
+                http://host:port/<context- root>/. In this case the path info is '/'
+                and the servlet path and context path is empty string ("").
              */
             if (p.isEmpty()) {
                 trace("URLPattern: '" + p + "' is a root");
@@ -1743,7 +1743,7 @@ public class Context implements ServletContext, InitParams
             }
 
             /*
-                A string containing only the ’/’ character indicates the "default"
+                A string containing only the '/' character indicates the "default"
                 servlet of the application. In this case the servlet path is the
                 request URI minus the context path and the path info is null.
              */
