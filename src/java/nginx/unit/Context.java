@@ -2518,41 +2518,51 @@ public class Context implements ServletContext, InitParams
 
     public boolean isSessionIdValid(String id)
     {
-        return sessions_.containsKey(id);
+        synchronized (sessions_) {
+            return sessions_.containsKey(id);
+        }
     }
 
     public Session getSession(String id)
     {
-        Session s = sessions_.get(id);
+        synchronized (sessions_) {
+            Session s = sessions_.get(id);
 
-        if (s != null) {
-            s.accessed();
+            if (s != null) {
+                s.accessed();
+            }
+
+            return s;
         }
-
-        return s;
     }
 
     public Session createSession()
     {
         Session session = new Session(this, generateSessionId());
 
-        sessions_.put(session.getId(), session);
+        synchronized (sessions_) {
+            sessions_.put(session.getId(), session);
 
-        return session;
+            return session;
+        }
     }
 
     public void invalidateSession(Session session)
     {
-        sessions_.remove(session.getId());
+        synchronized (sessions_) {
+            sessions_.remove(session.getId());
+        }
     }
 
     public void changeSessionId(Session session)
     {
-        sessions_.remove(session.getId());
+        synchronized (sessions_) {
+            sessions_.remove(session.getId());
 
-        session.setId(generateSessionId());
+            session.setId(generateSessionId());
 
-        sessions_.put(session.getId(), session);
+            sessions_.put(session.getId(), session);
+        }
     }
 
     private String generateSessionId()

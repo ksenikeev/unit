@@ -79,7 +79,9 @@ public class Session implements HttpSession, Serializable
     @Override
     public Object getAttribute(String s)
     {
-        return attributes.get(s);
+        synchronized (attributes) {
+            return attributes.get(s);
+        }
     }
 
     @Deprecated
@@ -92,20 +94,26 @@ public class Session implements HttpSession, Serializable
     @Override
     public Enumeration<String> getAttributeNames()
     {
-        return Collections.enumeration(attributes.keySet());
+        synchronized (attributes) {
+            return Collections.enumeration(attributes.keySet());
+        }
     }
 
     @Deprecated
     @Override
     public String[] getValueNames()
     {
-        return attributes.keySet().toArray(new String[attributes.keySet().size()]);
+        synchronized (attributes) {
+            return attributes.keySet().toArray(new String[attributes.keySet().size()]);
+        }
     }
 
     @Override
     public void setAttribute(String s, Object o)
     {
-        attributes.put(s,o);
+        synchronized (attributes) {
+            attributes.put(s, o);
+        }
     }
 
     @Deprecated
@@ -118,7 +126,9 @@ public class Session implements HttpSession, Serializable
     @Override
     public void removeAttribute(String s)
     {
-        attributes.remove(s);
+        synchronized (attributes) {
+            attributes.remove(s);
+        }
     }
 
     @Deprecated
@@ -142,9 +152,11 @@ public class Session implements HttpSession, Serializable
     }
 
     public void accessed() {
-        is_new = false;
+        synchronized (this) {
+            is_new = false;
 
-        last_access_time = access_time;
-        access_time = new Date().getTime();
+            last_access_time = access_time;
+            access_time = new Date().getTime();
+        }
     }
 }
