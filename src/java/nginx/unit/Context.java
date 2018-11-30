@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
@@ -160,17 +161,16 @@ public class Context implements ServletContext, InitParams
     private final List<ServletRequestListener> req_destroy_listeners_ = new ArrayList<>();
     private final List<ServletRequestAttributeListener> req_attr_listeners_ = new ArrayList<>();
 
+    private final SessionCookieConfig session_cookie_config_ = new UnitSessionCookieConfig();
+    private final Set<SessionTrackingMode> default_session_tracking_modes_ = new HashSet<>();
+    private Set<SessionTrackingMode> session_tracking_modes_ = default_session_tracking_modes_;
+    private int session_timeout_ = 60 * 60 * 1000;
+
+    private final Map<String, Session> sessions_ = new HashMap<>();
+
     private static final String WEB_INF = "WEB-INF/";
     private static final String WEB_INF_CLASSES = WEB_INF + "classes/";
     private static final String WEB_INF_LIB = WEB_INF + "lib/";
-
-    // SESSION
-    private static SessionManager sessionManager;
-    // SESSION
-    public SessionManager getSessionManager()
-    {
-        return sessionManager;
-    }
 
     private class PrefixPattern implements Comparable
     {
@@ -266,9 +266,6 @@ public class Context implements ServletContext, InitParams
     {
         Context ctx = new Context();
 
-        // SESSION
-        sessionManager = new SessionManager(ctx);
-
         ctx.loadApp(webapp, classpaths);
         ctx.initialized();
 
@@ -277,6 +274,7 @@ public class Context implements ServletContext, InitParams
 
     public Context()
     {
+        default_session_tracking_modes_.add(SessionTrackingMode.COOKIE);
     }
 
     public void loadApp(String webapp, URL[] classpaths) throws Exception
@@ -1050,7 +1048,6 @@ public class Context implements ServletContext, InitParams
             }
         }
 
-        // SESSION
         NodeList session_config = doc_elem.getElementsByTagName("session-config");
 
         for (int i = 0; i < session_config.getLength(); i++) {
@@ -1060,14 +1057,10 @@ public class Context implements ServletContext, InitParams
                 String timeout = session_timeout.item(0).getTextContent().trim();
 
                 trace("session_timeout: " + timeout);
-                if (sessionManager!=null){
-                    sessionManager.setSessionTimeOut(Integer.parseInt(timeout));
-                }
+                session_timeout_ = Integer.parseInt(timeout);
                 break;
             }
         }
-        //// SESSION
-        
     }
 
     private static int compareVersion(String ver1, String ver2)
@@ -2512,8 +2505,7 @@ public class Context implements ServletContext, InitParams
     {
         log("getDefaultSessionTrackingModes");
 
-        // SESSION
-        return sessionManager.getDefaultSessionTrackingModes();
+        return default_session_tracking_modes_;
     }
 
     @Override
@@ -2521,8 +2513,51 @@ public class Context implements ServletContext, InitParams
     {
         log("getEffectiveSessionTrackingModes");
 
-        // SESSION
-        return sessionManager.getEffectiveSessionTrackingModes();
+        return session_tracking_modes_;
+    }
+
+    public boolean isSessionIdValid(String id)
+    {
+        return sessions_.containsKey(id);
+    }
+
+    public Session getSession(String id)
+    {
+        Session s = sessions_.get(id);
+
+        if (s != null) {
+            s.accessed();
+        }
+
+        return s;
+    }
+
+    public Session createSession()
+    {
+        Session session = new Session(this, generateSessionId());
+
+        sessions_.put(session.getId(), session);
+
+        return session;
+    }
+
+    public void invalidateSession(Session session)
+    {
+        sessions_.remove(session.getId());
+    }
+
+    public void changeSessionId(Session session)
+    {
+        sessions_.remove(session.getId());
+
+        session.setId(generateSessionId());
+
+        sessions_.put(session.getId(), session);
+    }
+
+    private String generateSessionId()
+    {
+        return UUID.randomUUID().toString();
     }
 
     @Override
@@ -2557,20 +2592,16 @@ public class Context implements ServletContext, InitParams
     public SessionCookieConfig getSessionCookieConfig()
     {
         log("getSessionCookieConfig");
-        //LOG.warn(__unimplmented);
 
-        // SESSION
-        return  sessionManager.getSessionCookieConfig();
+        return session_cookie_config_;
     }
 
     @Override
-    public void setSessionTrackingModes(Set<SessionTrackingMode> sessionTrackingModes)
+    public void setSessionTrackingModes(Set<SessionTrackingMode> modes)
     {
         log("setSessionTrackingModes");
-        //LOG.warn(__unimplmented);
 
-        // SESSION
-        sessionManager.setSessionTrackingModes(sessionTrackingModes);
+        session_tracking_modes_ = modes;
     }
 
     @Override

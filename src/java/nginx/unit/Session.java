@@ -2,59 +2,59 @@ package nginx.unit;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpSession;
-import javax.servlet.http.HttpSessionContext;
 import java.io.Serializable;
-import java.util.*;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Andrey Kazankov
  */
-public class Session implements HttpSession, Serializable {
-
-    private Map<String, Object> attributesMap = new HashMap<>();
-    private long creationTime = new Date().getTime();
+public class Session implements HttpSession, Serializable
+{
+    private final Map<String, Object> attributes = new HashMap<>();
+    private final long creation_time = new Date().getTime();
+    private long last_access_time = 0;
+    private long access_time = creation_time;
     private String id;
-    private Context context;
-    boolean isNewSession = false;
+    private final Context context;
+    private boolean is_new = true;
 
-    public Session(Context context)
+    public Session(Context context, String id)
     {
-        SessionIdGenerator generator =  new UUIDSessionIdGenerator();
-        generator.init();
-        this.id = generator.generate();
-        isNewSession = true;
+        this.id = id;
         this.context = context;
     }
 
-
-    public Session(SessionIdGenerator idGenerator, Context context)
+    public void setId(String id)
     {
-        this.id = idGenerator.generate();
-        this.context = context;
+        this.id = id;
     }
 
     @Override
     public long getCreationTime()
     {
-        return creationTime;
+        return creation_time;
     }
 
     @Override
     public String getId()
     {
-        return  id;
+        return id;
     }
 
     @Override
     public long getLastAccessedTime()
     {
-        return 0;
+        return last_access_time;
     }
 
     @Override
     public ServletContext getServletContext()
     {
-        return null;
+        return context;
     }
 
     @Override
@@ -69,8 +69,9 @@ public class Session implements HttpSession, Serializable {
         return 0;
     }
 
+    @Deprecated
     @Override
-    public HttpSessionContext getSessionContext()
+    public javax.servlet.http.HttpSessionContext getSessionContext()
     {
         return null;
     }
@@ -78,7 +79,7 @@ public class Session implements HttpSession, Serializable {
     @Override
     public Object getAttribute(String s)
     {
-        return attributesMap.get(s);
+        return attributes.get(s);
     }
 
     @Deprecated
@@ -91,21 +92,20 @@ public class Session implements HttpSession, Serializable {
     @Override
     public Enumeration<String> getAttributeNames()
     {
-        return Collections.enumeration(attributesMap.keySet());
+        return Collections.enumeration(attributes.keySet());
     }
 
     @Deprecated
     @Override
     public String[] getValueNames()
     {
-        //(String[]) Collections.list(getAttributeNames()).toArray()
-        return attributesMap.keySet().toArray(new String[attributesMap.keySet().size()]);
+        return attributes.keySet().toArray(new String[attributes.keySet().size()]);
     }
 
     @Override
     public void setAttribute(String s, Object o)
     {
-        attributesMap.put(s,o);
+        attributes.put(s,o);
     }
 
     @Deprecated
@@ -118,7 +118,7 @@ public class Session implements HttpSession, Serializable {
     @Override
     public void removeAttribute(String s)
     {
-        attributesMap.remove(s);
+        attributes.remove(s);
     }
 
     @Deprecated
@@ -132,39 +132,19 @@ public class Session implements HttpSession, Serializable {
     @Override
     public void invalidate()
     {
-        context.getSessionManager().invalidate(this);
+        context.invalidateSession(this);
     }
 
     @Override
     public boolean isNew()
     {
-        return isNewSession;
+        return is_new;
     }
 
-    public void setIsNewSession(boolean b) {
-        isNewSession = b;
-    }
+    public void accessed() {
+        is_new = false;
 
-    public interface SessionIdGenerator
-    {
-        void init();
-        String generate();
-    }
-
-
-    public class UUIDSessionIdGenerator implements SessionIdGenerator
-    {
-
-        @Override
-        public void init()
-        {
-            // initialization id generator
-        }
-
-        @Override
-        public String generate()
-        {
-            return UUID.randomUUID().toString();
-        }
+        last_access_time = access_time;
+        access_time = new Date().getTime();
     }
 }
