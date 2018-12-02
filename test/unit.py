@@ -599,6 +599,10 @@ class TestUnitApplicationJava(TestUnitApplicationProto):
         if not os.path.isdir(self.testdir + '/java/WEB-INF/classes'):
             os.makedirs(self.testdir + '/java/WEB-INF/classes')
 
+        if os.path.isfile(self.current_dir + '/java/' + script + '/web.xml'):
+            shutil.copy2(self.current_dir + '/java/' + script + '/web.xml',
+                self.testdir + '/java/WEB-INF/')
+
         process = subprocess.Popen(['javac',
             '-d', self.testdir + '/java/WEB-INF/classes',
             '-classpath', self.pardir + '/build/javax.servlet-api-3.1.0.jar',
