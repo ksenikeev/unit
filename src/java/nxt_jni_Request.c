@@ -405,7 +405,7 @@ nxt_java_Request_getRequestURI(JNIEnv *env, jclass cls, jlong req_ptr)
 
     if (r->query.offset != 0) {
         query = nxt_unit_sptr_get(&r->query);
-        return nxt_java_newString(env, target, query - target);
+        return nxt_java_newString(env, target, query - target - 1);
     }
 
     return (*env)->NewStringUTF(env, target);
