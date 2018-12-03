@@ -24,7 +24,7 @@
 #include "java/nxt_jni_OutputStream.h"
 #include "java/nxt_jni_URLClassLoader.h"
 
-#include "nxt_java_jars.h"
+#include "nxt_jars.h"
 
 static nxt_int_t nxt_java_pre_init(nxt_task_t *task,
     nxt_common_app_conf_t *conf);
