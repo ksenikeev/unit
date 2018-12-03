@@ -1642,7 +1642,7 @@ public class Context implements ServletContext, InitParams
         {
             checkContextState();
 
-            log("ServletReg.setLoadOnStartup: " + loadOnStartup);
+            trace("ServletReg.setLoadOnStartup: " + loadOnStartup);
             load_on_startup_ = loadOnStartup;
         }
 
@@ -1940,7 +1940,7 @@ public class Context implements ServletContext, InitParams
             checkContextState();
 
             for (String n : servletNames) {
-                log("FilterReg.addMappingForServletNames: ... " + n);
+                trace("FilterReg.addMappingForServletNames: ... " + n);
 
                 ServletReg sreg = name2servlet_.get(n);
                 if (sreg == null) {
@@ -1973,7 +1973,7 @@ public class Context implements ServletContext, InitParams
             checkContextState();
 
             for (String u : urlPatterns) {
-                log("FilterReg.addMappingForUrlPatterns: ... " + u);
+                trace("FilterReg.addMappingForUrlPatterns: ... " + u);
 
                 URLPattern p = parseURLPattern(u);
                 FilterMap map = new FilterMap(this, p, dispatcherTypes,
@@ -2127,7 +2127,7 @@ public class Context implements ServletContext, InitParams
             throws ServletException, IOException
         {
             try {
-                log("CtxRequestDispatcher.forward");
+                trace("CtxRequestDispatcher.forward");
                 Request r = (Request) request;
 
                 String servlet_path = r.getServletPath();
@@ -2155,7 +2155,7 @@ public class Context implements ServletContext, InitParams
                 r.setRequestURI(req_uri);
                 r.setDispatcherType(dtype);
 
-                log("CtxRequestDispatcher.forward done");
+                trace("CtxRequestDispatcher.forward done");
             } catch (URISyntaxException e) {
                 throw new ServletException(e);
             }
@@ -2166,7 +2166,7 @@ public class Context implements ServletContext, InitParams
             throws ServletException, IOException
         {
             try {
-                log("CtxRequestDispatcher.include");
+                trace("CtxRequestDispatcher.include");
                 Request r = (Request) request;
 
                 DispatcherType dtype = request.getDispatcherType();
@@ -2186,10 +2186,9 @@ public class Context implements ServletContext, InitParams
                     servlet.service(r, response);
                 }
 
-
                 r.setDispatcherType(dtype);
 
-                log("CtxRequestDispatcher.include done");
+                trace("CtxRequestDispatcher.include done");
             } catch (URISyntaxException e) {
                 throw new ServletException(e);
             }
@@ -2206,14 +2205,14 @@ public class Context implements ServletContext, InitParams
     @Override
     public RequestDispatcher getRequestDispatcher(String uriInContext)
     {
-        log("getRequestDispatcher for " + uriInContext);
+        trace("getRequestDispatcher for " + uriInContext);
         return new CtxRequestDispatcher(uriInContext);
     }
 
     @Override
     public String getRealPath(String path)
     {
-        log("getRealPath for " + path);
+        trace("getRealPath for " + path);
 
         File f = new File(webapp_, path.substring(1));
 
@@ -2223,7 +2222,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public URL getResource(String path) throws MalformedURLException
     {
-        log("getResource for " + path);
+        trace("getResource for " + path);
 
         return new URL("file:" + getRealPath(path));
     }
@@ -2231,7 +2230,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public InputStream getResourceAsStream(String path)
     {
-        log("getResourceAsStream for " + path);
+        trace("getResourceAsStream for " + path);
 
         try {
             File f = new File(webapp_, path.substring(1));
@@ -2254,7 +2253,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public String getServerInfo()
     {
-        log("getServerInfo for " + server_info_);
+        trace("getServerInfo for " + server_info_);
         return server_info_;
     }
 

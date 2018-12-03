@@ -315,7 +315,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getRequestedSessionId()
     {
-        log("getRequestedSessionId");
+        trace("getRequestedSessionId");
 
         if (!request_session_id_parsed) {
             parseRequestSessionId();
@@ -399,7 +399,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public HttpSession getSession()
     {
-        log("getSession");
+        trace("getSession");
 
         return getSession(true);
     }
@@ -407,7 +407,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public HttpSession getSession(boolean create)
     {
-        log("getSession: " + create);
+        trace("getSession: " + create);
 
         if (session != null) {
             return session;
@@ -466,7 +466,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public boolean isRequestedSessionIdFromCookie()
     {
-        log("isRequestedSessionIdFromCookie");
+        trace("isRequestedSessionIdFromCookie");
 
         if (!request_session_id_parsed) {
             parseRequestSessionId();
@@ -479,7 +479,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Deprecated
     public boolean isRequestedSessionIdFromUrl()
     {
-        log("isRequestedSessionIdFromUrl");
+        trace("isRequestedSessionIdFromUrl");
 
         if (!request_session_id_parsed) {
             parseRequestSessionId();
@@ -491,7 +491,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public boolean isRequestedSessionIdFromURL()
     {
-        log("isRequestedSessionIdFromURL");
+        trace("isRequestedSessionIdFromURL");
 
         if (!request_session_id_parsed) {
             parseRequestSessionId();
@@ -503,7 +503,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public boolean isRequestedSessionIdValid()
     {
-        log("isRequestedSessionIdValid");
+        trace("isRequestedSessionIdValid");
 
         if (!request_session_id_parsed) {
             parseRequestSessionId();
@@ -616,7 +616,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public DispatcherType getDispatcherType()
     {
-        log("getDispatcherType");
+        trace("getDispatcherType");
 
         return dispatcher_type;
     }
@@ -847,7 +847,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getServerName()
     {
-        log("getServerName");
+        trace("getServerName");
 
         return getServerName(req_ptr);
     }
@@ -858,7 +858,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public int getServerPort()
     {
-        log("getServerPort");
+        trace("getServerPort");
 
         return getServerPort(req_ptr);
     }
@@ -957,7 +957,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String changeSessionId()
     {
-        log("changeSessionId");
+        trace("changeSessionId");
 
         getSession(false);
 
