@@ -383,7 +383,7 @@ public class Context implements ServletContext, InitParams
             if (!welcome_files_list_found_) {
                 welcome_files_.add("index.htm");
                 welcome_files_.add("index.html");
-                /* welcome_files_.add("index.jsp"); coming soon */
+                welcome_files_.add("index.jsp");
             }
 
             if (pattern2servlet_.get("*.jsp") == null) {
