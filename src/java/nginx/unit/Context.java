@@ -84,11 +84,14 @@ import javax.servlet.annotation.HandlesTypes;
 import javax.servlet.annotation.WebInitParam;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.annotation.WebFilter;
+import javax.servlet.annotation.WebListener;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSessionAttributeListener;
+import javax.servlet.http.HttpSessionBindingEvent;
+import javax.servlet.http.HttpSessionEvent;
 import javax.servlet.http.HttpSessionIdListener;
 import javax.servlet.http.HttpSessionListener;
 
@@ -147,12 +150,17 @@ public class Context implements ServletContext, InitParams
     private final Map<String, String> exception2location_ = new HashMap<>();
     private final Map<Integer, String> error2location_ = new HashMap<>();
 
-    public static final Class<?>[] SERVLET_LISTENER_TYPES = new Class[] {
+    public static final Class<?>[] LISTENER_TYPES = new Class[] {
         ServletContextListener.class,
         ServletContextAttributeListener.class,
         ServletRequestListener.class,
-        ServletRequestAttributeListener.class
+        ServletRequestAttributeListener.class,
+        HttpSessionAttributeListener.class,
+        HttpSessionIdListener.class,
+        HttpSessionListener.class
     };
+
+    private final Set<String> listener_classnames_ = new HashSet<>();
 
     private final List<ServletContextListener> ctx_listeners_ = new ArrayList<>();
     private final List<ServletContextListener> destroy_listeners_ = new ArrayList<>();
@@ -160,6 +168,12 @@ public class Context implements ServletContext, InitParams
     private final List<ServletRequestListener> req_init_listeners_ = new ArrayList<>();
     private final List<ServletRequestListener> req_destroy_listeners_ = new ArrayList<>();
     private final List<ServletRequestAttributeListener> req_attr_listeners_ = new ArrayList<>();
+
+    private final List<HttpSessionAttributeListener> sess_attr_listeners_ = new ArrayList<>();
+    private final List<HttpSessionIdListener> sess_id_listeners_ = new ArrayList<>();
+    private final List<HttpSessionListener> sess_listeners_ = new ArrayList<>();
+
+    private SessionAttrListener attr_listener_ = null;
 
     private final SessionCookieConfig session_cookie_config_ = new UnitSessionCookieConfig();
     private final Set<SessionTrackingMode> default_session_tracking_modes_ = new HashSet<>();
@@ -1268,26 +1282,52 @@ public class Context implements ServletContext, InitParams
             reg.setAsyncSupported(ann.asyncSupported());
         }
 
-        for (Class<?> lstnr_type : SERVLET_LISTENER_TYPES) {
-            ClassInfoList lstnrs = scan_res.getClassesImplementing(lstnr_type.getName());
 
-            for (ClassInfo ci : lstnrs) {
-                if (ci.isInterface()
-                    || ci.isAnnotation()
-                    || ci.isAbstract())
-                {
-                    trace("scanClasses: listener impl: " + ci.getName());
-                    continue;
-                }
+        ClassInfoList lstnrs = scan_res.getClassesWithAnnotation(WebListener.class.getName());
 
-                trace("scanClasses: listener class: " + ci.getName());
-
-                Class<?> cls = ci.loadClass();
-                Constructor<?> ctor = cls.getConstructor();
-                EventListener listener = (EventListener) ctor.newInstance();
-
-                addListener(listener);
+        for (ClassInfo ci : lstnrs) {
+            if (ci.isInterface()
+                || ci.isAnnotation()
+                || ci.isAbstract())
+            {
+                trace("scanClasses: listener impl: " + ci.getName());
+                continue;
             }
+
+            trace("scanClasses: listener class: " + ci.getName());
+
+            if (listener_classnames_.contains(ci.getName())) {
+                trace("scanClasses: " + ci.getName() + " already added as listener");
+                continue;
+            }
+
+            Class<?> cls = ci.loadClass();
+            Class<?> lclass = null;
+            for (Class<?> c : LISTENER_TYPES) {
+                if (c.isAssignableFrom(cls)) {
+                    lclass = c;
+                    break;
+                }
+            }
+
+            if (lclass == null) {
+                log("scanClasses: " + ci.getName() + " implements none of known listener interfaces");
+                continue;
+            }
+
+            WebListener ann = cls.getAnnotation(WebListener.class);
+
+            if (ann == null) {
+                log("scanClasses: no WebListener annotation");
+                continue;
+            }
+
+            Constructor<?> ctor = cls.getConstructor();
+            EventListener listener = (EventListener) ctor.newInstance();
+
+            addListener(listener);
+
+            listener_classnames_.add(ci.getName());
         }
     }
 
@@ -2001,6 +2041,10 @@ public class Context implements ServletContext, InitParams
 
     private void initialized()
     {
+        if (!sess_attr_listeners_.isEmpty()) {
+            attr_listener_ = new SessionAttrListener();
+        }
+
         ClassLoader old = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(loader_);
 
@@ -2538,7 +2582,17 @@ public class Context implements ServletContext, InitParams
 
     public Session createSession()
     {
-        Session session = new Session(this, generateSessionId());
+        Session session = new Session(this, generateSessionId(), attr_listener_);
+
+        if (!sess_listeners_.isEmpty())
+        {
+            HttpSessionEvent event = new HttpSessionEvent(session);
+
+            for (HttpSessionListener l : sess_listeners_)
+            {
+                l.sessionCreated(event);
+            }
+        }
 
         synchronized (sessions_) {
             sessions_.put(session.getId(), session);
@@ -2552,22 +2606,71 @@ public class Context implements ServletContext, InitParams
         synchronized (sessions_) {
             sessions_.remove(session.getId());
         }
+
+        if (!sess_listeners_.isEmpty())
+        {
+            HttpSessionEvent event = new HttpSessionEvent(session);
+
+            for (int i = sess_listeners_.size() - 1; i >= 0; i--)
+            {
+                sess_listeners_.get(i).sessionDestroyed(event);
+            }
+        }
     }
 
     public void changeSessionId(Session session)
     {
+        String old_id;
+
         synchronized (sessions_) {
-            sessions_.remove(session.getId());
+            old_id = session.getId();
+            sessions_.remove(old_id);
 
             session.setId(generateSessionId());
 
             sessions_.put(session.getId(), session);
+        }
+
+        if (!sess_id_listeners_.isEmpty())
+        {
+            HttpSessionEvent event = new HttpSessionEvent(session);
+            for (HttpSessionIdListener l : sess_id_listeners_)
+            {
+                l.sessionIdChanged(event, old_id);
+            }
         }
     }
 
     private String generateSessionId()
     {
         return UUID.randomUUID().toString();
+    }
+
+    private class SessionAttrListener implements HttpSessionAttributeListener
+    {
+        @Override
+        public void attributeAdded(HttpSessionBindingEvent event)
+        {
+            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
+                l.attributeAdded(event);
+            }
+        }
+
+        @Override
+        public void attributeRemoved(HttpSessionBindingEvent event)
+        {
+            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
+                l.attributeRemoved(event);
+            }
+        }
+
+        @Override
+        public void attributeReplaced(HttpSessionBindingEvent event)
+        {
+            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
+                l.attributeReplaced(event);
+            }
+        }
     }
 
     @Override
@@ -2621,6 +2724,11 @@ public class Context implements ServletContext, InitParams
 
         checkContextState();
 
+        if (listener_classnames_.contains(className)) {
+            log("addListener<N> " + className + " already added as listener");
+            return;
+        }
+
         try {
             Class<?> cls = loader_.loadClass(className);
 
@@ -2628,6 +2736,8 @@ public class Context implements ServletContext, InitParams
             EventListener listener = (EventListener) ctor.newInstance();
 
             addListener(listener);
+
+            listener_classnames_.add(className);
         } catch (Exception e) {
             log("addListener<N>: exception caught: " + e.toString());
         }
@@ -2640,8 +2750,8 @@ public class Context implements ServletContext, InitParams
 
         checkContextState();
 
-        for (int i = 0; i < SERVLET_LISTENER_TYPES.length; i++) {
-            Class<?> c = SERVLET_LISTENER_TYPES[i];
+        for (int i = 0; i < LISTENER_TYPES.length; i++) {
+            Class<?> c = LISTENER_TYPES[i];
             if (c.isAssignableFrom(t.getClass())) {
                 log("addListener<T>: assignable to " + c.getName());
             }
@@ -2663,20 +2773,40 @@ public class Context implements ServletContext, InitParams
         if (t instanceof ServletRequestAttributeListener) {
             req_attr_listeners_.add((ServletRequestAttributeListener) t);
         }
+
+        if (t instanceof HttpSessionAttributeListener) {
+            sess_attr_listeners_.add((HttpSessionAttributeListener) t);
+        }
+
+        if (t instanceof HttpSessionIdListener) {
+            sess_id_listeners_.add((HttpSessionIdListener) t);
+        }
+
+        if (t instanceof HttpSessionListener) {
+            sess_listeners_.add((HttpSessionListener) t);
+        }
     }
 
     @Override
     public void addListener(Class<? extends EventListener> listenerClass)
     {
-        log("addListener<C> " + listenerClass.getName());
+        String className = listenerClass.getName();
+        log("addListener<C> " + className);
 
         checkContextState();
+
+        if (listener_classnames_.contains(className)) {
+            log("addListener<C> " + className + " already added as listener");
+            return;
+        }
 
         try {
             Constructor<?> ctor = listenerClass.getConstructor();
             EventListener listener = (EventListener) ctor.newInstance();
 
             addListener(listener);
+
+            listener_classnames_.add(className);
         } catch (Exception e) {
             log("addListener<C>: exception caught: " + e.toString());
         }

@@ -1,8 +1,13 @@
 package nginx.unit;
 
+import java.io.Serializable;
+
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpSession;
-import java.io.Serializable;
+import javax.servlet.http.HttpSessionAttributeListener;
+import javax.servlet.http.HttpSessionBindingEvent;
+import javax.servlet.http.HttpSessionBindingListener;
+
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
@@ -21,11 +26,13 @@ public class Session implements HttpSession, Serializable
     private String id;
     private final Context context;
     private boolean is_new = true;
+    private final HttpSessionAttributeListener attr_listener;
 
-    public Session(Context context, String id)
+    public Session(Context context, String id, HttpSessionAttributeListener al)
     {
         this.id = id;
         this.context = context;
+        attr_listener = al;
     }
 
     public void setId(String id)
@@ -111,8 +118,49 @@ public class Session implements HttpSession, Serializable
     @Override
     public void setAttribute(String s, Object o)
     {
+        Object old;
+
+        if (o != null && o instanceof HttpSessionBindingListener) {
+            HttpSessionBindingListener l = (HttpSessionBindingListener) o;
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s);
+
+            l.valueBound(e);
+        }
+
         synchronized (attributes) {
-            attributes.put(s, o);
+            if (o != null) {
+                old = attributes.put(s, o);
+            } else {
+                old = attributes.remove(s);
+            }
+        }
+
+        if (old != null && old instanceof HttpSessionBindingListener) {
+            HttpSessionBindingListener l = (HttpSessionBindingListener) old;
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s);
+
+            l.valueUnbound(e);
+        }
+
+        if (attr_listener == null) {
+            return;
+        }
+
+        if (o == null) {
+            if (old != null) {
+                HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s, old);
+                attr_listener.attributeRemoved(e);
+            }
+
+            return;
+        }
+
+        if (old != null) {
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s, old);
+            attr_listener.attributeReplaced(e);
+        } else {
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s, o);
+            attr_listener.attributeAdded(e);
         }
     }
 
@@ -126,9 +174,25 @@ public class Session implements HttpSession, Serializable
     @Override
     public void removeAttribute(String s)
     {
+        Object o;
+
         synchronized (attributes) {
-            attributes.remove(s);
+            o = attributes.remove(s);
         }
+
+        if (o != null && o instanceof HttpSessionBindingListener) {
+            HttpSessionBindingListener l = (HttpSessionBindingListener) o;
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s);
+
+            l.valueUnbound(e);
+        }
+
+        if (attr_listener == null || o == null) {
+            return;
+        }
+
+        HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s, o);
+        attr_listener.attributeRemoved(e);
     }
 
     @Deprecated
@@ -138,11 +202,27 @@ public class Session implements HttpSession, Serializable
         removeAttribute(s);
     }
 
-
     @Override
     public void invalidate()
     {
         context.invalidateSession(this);
+
+        unboundAttributes();
+    }
+
+    private void unboundAttributes()
+    {
+        for (Map.Entry<String, Object> a : attributes.entrySet()) {
+            Object o = a.getValue();
+            if (o != null && o instanceof HttpSessionBindingListener) {
+                HttpSessionBindingListener l = (HttpSessionBindingListener) o;
+                HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, a.getKey());
+
+                l.valueUnbound(e);
+            }
+        }
+
+        attributes.clear();
     }
 
     @Override
