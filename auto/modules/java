@@ -193,7 +193,7 @@ fi
 
 NXT_JAVA_VERSION=`$NXT_JAVAC -version 2>&1`
 NXT_JAVA_VERSION=${NXT_JAVA_VERSION#javac }
-NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -DNXT_JAVA_VERSION=$NXT_JAVA_VERSION"
+NXT_JAVA_INCLUDE="$NXT_JAVA_INCLUDE -I$NXT_BUILD_DIR/$NXT_JAVA_MODULE -DNXT_JAVA_VERSION=$NXT_JAVA_VERSION"
 
 if grep ^$NXT_JAVA_MODULE: $NXT_MAKEFILE 2>&1 > /dev/null; then
     $echo
@@ -203,13 +203,14 @@ if grep ^$NXT_JAVA_MODULE: $NXT_MAKEFILE 2>&1 > /dev/null; then
 fi
 
 NXT_UNIT_JAR_VERSION=`grep 'define NXT_VERSION' src/nxt_main.h | sed -e 's/^.*"\(.*\)".*/\1/'`
-NXT_UNIT_JAR=nginx-unit-$NXT_UNIT_JAR_VERSION.jar
+NXT_UNIT_JAR=${NXT_JAVA_MODULE}-nginx-unit-$NXT_UNIT_JAR_VERSION.jar
 
-NXT_JAVA_BUILD_CP=$NXT_BUILD_DIR/java
+NXT_JAVA_BUILD_CP=$NXT_BUILD_DIR/$NXT_JAVA_MODULE
 NXT_JAVA_INSTALL_JARS=$NXT_BUILD_DIR/$NXT_UNIT_JAR
 NXT_JAVA_UNINSTALL_JARS="\$(DESTDIR)$NXT_MODULES/$NXT_UNIT_JAR"
 
-NXT_JAVA_JARS=$NXT_BUILD_DIR/nxt_java_jars.h
+NXT_JAVA_JARS=$NXT_BUILD_DIR/$NXT_JAVA_MODULE/nxt_jars.h
+mkdir -p $NXT_BUILD_DIR/$NXT_JAVA_MODULE
 
 cat << END > $NXT_JAVA_JARS
 #ifndef _NXT_JAVA_JARS_INCLUDED_
@@ -240,8 +241,6 @@ cat << END >> $NXT_JAVA_JARS
 static const char *nxt_java_unit_jars[] = {
     "$NXT_UNIT_JAR",
 END
-
-mkdir -p "$NXT_BUILD_DIR/java"
 
 NXT_JAR_VERSION=9.4.12.v20180830
 NXT_JAR_NAMESPACE=org/eclipse/jetty/
@@ -349,29 +348,29 @@ $NXT_BUILD_DIR/${NXT_JAVA_MODULE}.unit.so: $nxt_objs
 	$nxt_objs $NXT_JAVA_LDFLAGS $NXT_LD_OPT
 
 NXT_JAVA_CLASSES = \\
-    $NXT_BUILD_DIR/java/nginx/unit/Context.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/DynamicPathRequest.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/DynamicDispatcherRequest.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/HeaderNamesEnumeration.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/HeadersEnumeration.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/InitParams.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/InputStream.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/OutputStream.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/Request.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/Response.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/Session.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/SessionManager.class \\
-    $NXT_BUILD_DIR/java/nginx/unit/UnitSessionCookieConfig.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Context.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/DynamicPathRequest.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/DynamicDispatcherRequest.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/HeaderNamesEnumeration.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/HeadersEnumeration.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/InitParams.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/InputStream.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/OutputStream.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Request.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Response.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Session.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/UnitSessionCookieConfig.class \\
 
-\$(NXT_JAVA_CLASSES): $NXT_BUILD_DIR/java/.classes
+\$(NXT_JAVA_CLASSES): $NXT_BUILD_DIR/$NXT_JAVA_MODULE/.classes
 
-.INTERMEDIATE: $NXT_BUILD_DIR/java/.classes
+.INTERMEDIATE: $NXT_BUILD_DIR/$NXT_JAVA_MODULE/.classes
 
-$NXT_BUILD_DIR/java/.classes: \$(patsubst $NXT_BUILD_DIR/java/%, src/java/%, \$(NXT_JAVA_CLASSES:.class=.java) )
-	$NXT_JAVAC -d $NXT_BUILD_DIR/java -cp $NXT_JAVA_BUILD_CP \$^
+$NXT_BUILD_DIR/$NXT_JAVA_MODULE/.classes: \$(patsubst $NXT_BUILD_DIR/$NXT_JAVA_MODULE/%, src/java/%, \$(NXT_JAVA_CLASSES:.class=.java) )
+	rm -rf $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx
+	$NXT_JAVAC -d $NXT_BUILD_DIR/$NXT_JAVA_MODULE -cp $NXT_JAVA_BUILD_CP \$^
 
 $NXT_BUILD_DIR/$NXT_UNIT_JAR: \$(NXT_JAVA_CLASSES)
-	$NXT_JAVA_HOME/bin/jar c -C $NXT_BUILD_DIR/java nginx/unit > \$@
+	$NXT_JAVA_HOME/bin/jar c -C $NXT_BUILD_DIR/$NXT_JAVA_MODULE nginx/unit > \$@
 
 
 install: ${NXT_JAVA_MODULE}-install

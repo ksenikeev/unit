@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
@@ -83,11 +84,14 @@ import javax.servlet.annotation.HandlesTypes;
 import javax.servlet.annotation.WebInitParam;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.annotation.WebFilter;
+import javax.servlet.annotation.WebListener;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSessionAttributeListener;
+import javax.servlet.http.HttpSessionBindingEvent;
+import javax.servlet.http.HttpSessionEvent;
 import javax.servlet.http.HttpSessionIdListener;
 import javax.servlet.http.HttpSessionListener;
 
@@ -146,12 +150,17 @@ public class Context implements ServletContext, InitParams
     private final Map<String, String> exception2location_ = new HashMap<>();
     private final Map<Integer, String> error2location_ = new HashMap<>();
 
-    public static final Class<?>[] SERVLET_LISTENER_TYPES = new Class[] {
+    public static final Class<?>[] LISTENER_TYPES = new Class[] {
         ServletContextListener.class,
         ServletContextAttributeListener.class,
         ServletRequestListener.class,
-        ServletRequestAttributeListener.class
+        ServletRequestAttributeListener.class,
+        HttpSessionAttributeListener.class,
+        HttpSessionIdListener.class,
+        HttpSessionListener.class
     };
+
+    private final Set<String> listener_classnames_ = new HashSet<>();
 
     private final List<ServletContextListener> ctx_listeners_ = new ArrayList<>();
     private final List<ServletContextListener> destroy_listeners_ = new ArrayList<>();
@@ -160,17 +169,22 @@ public class Context implements ServletContext, InitParams
     private final List<ServletRequestListener> req_destroy_listeners_ = new ArrayList<>();
     private final List<ServletRequestAttributeListener> req_attr_listeners_ = new ArrayList<>();
 
+    private final List<HttpSessionAttributeListener> sess_attr_listeners_ = new ArrayList<>();
+    private final List<HttpSessionIdListener> sess_id_listeners_ = new ArrayList<>();
+    private final List<HttpSessionListener> sess_listeners_ = new ArrayList<>();
+
+    private SessionAttrListener attr_listener_ = null;
+
+    private final SessionCookieConfig session_cookie_config_ = new UnitSessionCookieConfig();
+    private final Set<SessionTrackingMode> default_session_tracking_modes_ = new HashSet<>();
+    private Set<SessionTrackingMode> session_tracking_modes_ = default_session_tracking_modes_;
+    private int session_timeout_ = 60 * 60 * 1000;
+
+    private final Map<String, Session> sessions_ = new HashMap<>();
+
     private static final String WEB_INF = "WEB-INF/";
     private static final String WEB_INF_CLASSES = WEB_INF + "classes/";
     private static final String WEB_INF_LIB = WEB_INF + "lib/";
-
-    // SESSION
-    private static SessionManager sessionManager;
-    // SESSION
-    public SessionManager getSessionManager()
-    {
-        return sessionManager;
-    }
 
     private class PrefixPattern implements Comparable
     {
@@ -266,9 +280,6 @@ public class Context implements ServletContext, InitParams
     {
         Context ctx = new Context();
 
-        // SESSION
-        sessionManager = new SessionManager(ctx);
-
         ctx.loadApp(webapp, classpaths);
         ctx.initialized();
 
@@ -277,6 +288,7 @@ public class Context implements ServletContext, InitParams
 
     public Context()
     {
+        default_session_tracking_modes_.add(SessionTrackingMode.COOKIE);
     }
 
     public void loadApp(String webapp, URL[] classpaths) throws Exception
@@ -371,7 +383,7 @@ public class Context implements ServletContext, InitParams
             if (!welcome_files_list_found_) {
                 welcome_files_.add("index.htm");
                 welcome_files_.add("index.html");
-                /* welcome_files_.add("index.jsp"); coming soon */
+                welcome_files_.add("index.jsp");
             }
 
             if (pattern2servlet_.get("*.jsp") == null) {
@@ -518,7 +530,7 @@ public class Context implements ServletContext, InitParams
         /*
             2. The container will recursively try to match the longest
                path-prefix. This is done by stepping down the path tree a
-               directory at a time, using the ’/’ character as a path separator.
+               directory at a time, using the '/' character as a path separator.
                The longest match determines the servlet selected.
          */
         for (PrefixPattern p : prefix_patterns_) {
@@ -536,7 +548,7 @@ public class Context implements ServletContext, InitParams
             3. If the last segment in the URL path contains an extension
                (e.g. .jsp), the servlet container will try to match a servlet
                that handles requests for the extension. An extension is defined
-               as the part of the last segment after the last ’.’ character.
+               as the part of the last segment after the last '.' character.
          */
         int suffix_start = path.lastIndexOf('.');
         if (suffix_start != -1) {
@@ -1050,7 +1062,6 @@ public class Context implements ServletContext, InitParams
             }
         }
 
-        // SESSION
         NodeList session_config = doc_elem.getElementsByTagName("session-config");
 
         for (int i = 0; i < session_config.getLength(); i++) {
@@ -1060,14 +1071,10 @@ public class Context implements ServletContext, InitParams
                 String timeout = session_timeout.item(0).getTextContent().trim();
 
                 trace("session_timeout: " + timeout);
-                if (sessionManager!=null){
-                    sessionManager.setSessionTimeOut(Integer.parseInt(timeout));
-                }
+                session_timeout_ = Integer.parseInt(timeout);
                 break;
             }
         }
-        //// SESSION
-        
     }
 
     private static int compareVersion(String ver1, String ver2)
@@ -1275,26 +1282,52 @@ public class Context implements ServletContext, InitParams
             reg.setAsyncSupported(ann.asyncSupported());
         }
 
-        for (Class<?> lstnr_type : SERVLET_LISTENER_TYPES) {
-            ClassInfoList lstnrs = scan_res.getClassesImplementing(lstnr_type.getName());
 
-            for (ClassInfo ci : lstnrs) {
-                if (ci.isInterface()
-                    || ci.isAnnotation()
-                    || ci.isAbstract())
-                {
-                    trace("scanClasses: listener impl: " + ci.getName());
-                    continue;
-                }
+        ClassInfoList lstnrs = scan_res.getClassesWithAnnotation(WebListener.class.getName());
 
-                trace("scanClasses: listener class: " + ci.getName());
-
-                Class<?> cls = ci.loadClass();
-                Constructor<?> ctor = cls.getConstructor();
-                EventListener listener = (EventListener) ctor.newInstance();
-
-                addListener(listener);
+        for (ClassInfo ci : lstnrs) {
+            if (ci.isInterface()
+                || ci.isAnnotation()
+                || ci.isAbstract())
+            {
+                trace("scanClasses: listener impl: " + ci.getName());
+                continue;
             }
+
+            trace("scanClasses: listener class: " + ci.getName());
+
+            if (listener_classnames_.contains(ci.getName())) {
+                trace("scanClasses: " + ci.getName() + " already added as listener");
+                continue;
+            }
+
+            Class<?> cls = ci.loadClass();
+            Class<?> lclass = null;
+            for (Class<?> c : LISTENER_TYPES) {
+                if (c.isAssignableFrom(cls)) {
+                    lclass = c;
+                    break;
+                }
+            }
+
+            if (lclass == null) {
+                log("scanClasses: " + ci.getName() + " implements none of known listener interfaces");
+                continue;
+            }
+
+            WebListener ann = cls.getAnnotation(WebListener.class);
+
+            if (ann == null) {
+                log("scanClasses: no WebListener annotation");
+                continue;
+            }
+
+            Constructor<?> ctor = cls.getConstructor();
+            EventListener listener = (EventListener) ctor.newInstance();
+
+            addListener(listener);
+
+            listener_classnames_.add(ci.getName());
         }
     }
 
@@ -1609,7 +1642,7 @@ public class Context implements ServletContext, InitParams
         {
             checkContextState();
 
-            log("ServletReg.setLoadOnStartup: " + loadOnStartup);
+            trace("ServletReg.setLoadOnStartup: " + loadOnStartup);
             load_on_startup_ = loadOnStartup;
         }
 
@@ -1738,7 +1771,7 @@ public class Context implements ServletContext, InitParams
             /*
                 12.2 Specification of Mappings
                 ...
-                A string beginning with a ‘/’ character and ending with a ‘/*’
+                A string beginning with a '/' character and ending with a '/*'
                 suffix is used for path mapping.
              */
             if (p.startsWith("/") && p.endsWith("/*")) {
@@ -1749,7 +1782,7 @@ public class Context implements ServletContext, InitParams
             }
 
             /*
-                A string beginning with a ‘*.’ prefix is used as an extension
+                A string beginning with a '*.' prefix is used as an extension
                 mapping.
              */
             if (p.startsWith("*.")) {
@@ -1762,8 +1795,8 @@ public class Context implements ServletContext, InitParams
             /*
                 The empty string ("") is a special URL pattern that exactly maps to
                 the application's context root, i.e., requests of the form
-                http://host:port/<context- root>/. In this case the path info is ’/’
-                and the servlet path and context path is empty string (““).
+                http://host:port/<context- root>/. In this case the path info is '/'
+                and the servlet path and context path is empty string ("").
              */
             if (p.isEmpty()) {
                 trace("URLPattern: '" + p + "' is a root");
@@ -1773,7 +1806,7 @@ public class Context implements ServletContext, InitParams
             }
 
             /*
-                A string containing only the ’/’ character indicates the "default"
+                A string containing only the '/' character indicates the "default"
                 servlet of the application. In this case the servlet path is the
                 request URI minus the context path and the path info is null.
              */
@@ -1907,7 +1940,7 @@ public class Context implements ServletContext, InitParams
             checkContextState();
 
             for (String n : servletNames) {
-                log("FilterReg.addMappingForServletNames: ... " + n);
+                trace("FilterReg.addMappingForServletNames: ... " + n);
 
                 ServletReg sreg = name2servlet_.get(n);
                 if (sreg == null) {
@@ -1940,7 +1973,7 @@ public class Context implements ServletContext, InitParams
             checkContextState();
 
             for (String u : urlPatterns) {
-                log("FilterReg.addMappingForUrlPatterns: ... " + u);
+                trace("FilterReg.addMappingForUrlPatterns: ... " + u);
 
                 URLPattern p = parseURLPattern(u);
                 FilterMap map = new FilterMap(this, p, dispatcherTypes,
@@ -2008,6 +2041,10 @@ public class Context implements ServletContext, InitParams
 
     private void initialized()
     {
+        if (!sess_attr_listeners_.isEmpty()) {
+            attr_listener_ = new SessionAttrListener();
+        }
+
         ClassLoader old = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(loader_);
 
@@ -2090,7 +2127,7 @@ public class Context implements ServletContext, InitParams
             throws ServletException, IOException
         {
             try {
-                log("CtxRequestDispatcher.forward");
+                trace("CtxRequestDispatcher.forward");
                 Request r = (Request) request;
 
                 String servlet_path = r.getServletPath();
@@ -2118,7 +2155,7 @@ public class Context implements ServletContext, InitParams
                 r.setRequestURI(req_uri);
                 r.setDispatcherType(dtype);
 
-                log("CtxRequestDispatcher.forward done");
+                trace("CtxRequestDispatcher.forward done");
             } catch (URISyntaxException e) {
                 throw new ServletException(e);
             }
@@ -2129,7 +2166,7 @@ public class Context implements ServletContext, InitParams
             throws ServletException, IOException
         {
             try {
-                log("CtxRequestDispatcher.include");
+                trace("CtxRequestDispatcher.include");
                 Request r = (Request) request;
 
                 DispatcherType dtype = request.getDispatcherType();
@@ -2149,10 +2186,9 @@ public class Context implements ServletContext, InitParams
                     servlet.service(r, response);
                 }
 
-
                 r.setDispatcherType(dtype);
 
-                log("CtxRequestDispatcher.include done");
+                trace("CtxRequestDispatcher.include done");
             } catch (URISyntaxException e) {
                 throw new ServletException(e);
             }
@@ -2169,14 +2205,14 @@ public class Context implements ServletContext, InitParams
     @Override
     public RequestDispatcher getRequestDispatcher(String uriInContext)
     {
-        log("getRequestDispatcher for " + uriInContext);
+        trace("getRequestDispatcher for " + uriInContext);
         return new CtxRequestDispatcher(uriInContext);
     }
 
     @Override
     public String getRealPath(String path)
     {
-        log("getRealPath for " + path);
+        trace("getRealPath for " + path);
 
         File f = new File(webapp_, path.substring(1));
 
@@ -2186,7 +2222,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public URL getResource(String path) throws MalformedURLException
     {
-        log("getResource for " + path);
+        trace("getResource for " + path);
 
         return new URL("file:" + getRealPath(path));
     }
@@ -2194,7 +2230,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public InputStream getResourceAsStream(String path)
     {
-        log("getResourceAsStream for " + path);
+        trace("getResourceAsStream for " + path);
 
         try {
             File f = new File(webapp_, path.substring(1));
@@ -2217,7 +2253,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public String getServerInfo()
     {
-        log("getServerInfo for " + server_info_);
+        trace("getServerInfo for " + server_info_);
         return server_info_;
     }
 
@@ -2512,8 +2548,7 @@ public class Context implements ServletContext, InitParams
     {
         log("getDefaultSessionTrackingModes");
 
-        // SESSION
-        return sessionManager.getDefaultSessionTrackingModes();
+        return default_session_tracking_modes_;
     }
 
     @Override
@@ -2521,8 +2556,120 @@ public class Context implements ServletContext, InitParams
     {
         log("getEffectiveSessionTrackingModes");
 
-        // SESSION
-        return sessionManager.getEffectiveSessionTrackingModes();
+        return session_tracking_modes_;
+    }
+
+    public boolean isSessionIdValid(String id)
+    {
+        synchronized (sessions_) {
+            return sessions_.containsKey(id);
+        }
+    }
+
+    public Session getSession(String id)
+    {
+        synchronized (sessions_) {
+            Session s = sessions_.get(id);
+
+            if (s != null) {
+                s.accessed();
+            }
+
+            return s;
+        }
+    }
+
+    public Session createSession()
+    {
+        Session session = new Session(this, generateSessionId(), attr_listener_);
+
+        if (!sess_listeners_.isEmpty())
+        {
+            HttpSessionEvent event = new HttpSessionEvent(session);
+
+            for (HttpSessionListener l : sess_listeners_)
+            {
+                l.sessionCreated(event);
+            }
+        }
+
+        synchronized (sessions_) {
+            sessions_.put(session.getId(), session);
+
+            return session;
+        }
+    }
+
+    public void invalidateSession(Session session)
+    {
+        synchronized (sessions_) {
+            sessions_.remove(session.getId());
+        }
+
+        if (!sess_listeners_.isEmpty())
+        {
+            HttpSessionEvent event = new HttpSessionEvent(session);
+
+            for (int i = sess_listeners_.size() - 1; i >= 0; i--)
+            {
+                sess_listeners_.get(i).sessionDestroyed(event);
+            }
+        }
+    }
+
+    public void changeSessionId(Session session)
+    {
+        String old_id;
+
+        synchronized (sessions_) {
+            old_id = session.getId();
+            sessions_.remove(old_id);
+
+            session.setId(generateSessionId());
+
+            sessions_.put(session.getId(), session);
+        }
+
+        if (!sess_id_listeners_.isEmpty())
+        {
+            HttpSessionEvent event = new HttpSessionEvent(session);
+            for (HttpSessionIdListener l : sess_id_listeners_)
+            {
+                l.sessionIdChanged(event, old_id);
+            }
+        }
+    }
+
+    private String generateSessionId()
+    {
+        return UUID.randomUUID().toString();
+    }
+
+    private class SessionAttrListener implements HttpSessionAttributeListener
+    {
+        @Override
+        public void attributeAdded(HttpSessionBindingEvent event)
+        {
+            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
+                l.attributeAdded(event);
+            }
+        }
+
+        @Override
+        public void attributeRemoved(HttpSessionBindingEvent event)
+        {
+            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
+                l.attributeRemoved(event);
+            }
+        }
+
+        @Override
+        public void attributeReplaced(HttpSessionBindingEvent event)
+        {
+            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
+                l.attributeReplaced(event);
+            }
+        }
     }
 
     @Override
@@ -2557,20 +2704,16 @@ public class Context implements ServletContext, InitParams
     public SessionCookieConfig getSessionCookieConfig()
     {
         log("getSessionCookieConfig");
-        //LOG.warn(__unimplmented);
 
-        // SESSION
-        return  sessionManager.getSessionCookieConfig();
+        return session_cookie_config_;
     }
 
     @Override
-    public void setSessionTrackingModes(Set<SessionTrackingMode> sessionTrackingModes)
+    public void setSessionTrackingModes(Set<SessionTrackingMode> modes)
     {
         log("setSessionTrackingModes");
-        //LOG.warn(__unimplmented);
 
-        // SESSION
-        sessionManager.setSessionTrackingModes(sessionTrackingModes);
+        session_tracking_modes_ = modes;
     }
 
     @Override
@@ -2580,6 +2723,11 @@ public class Context implements ServletContext, InitParams
 
         checkContextState();
 
+        if (listener_classnames_.contains(className)) {
+            log("addListener<N> " + className + " already added as listener");
+            return;
+        }
+
         try {
             Class<?> cls = loader_.loadClass(className);
 
@@ -2587,6 +2735,8 @@ public class Context implements ServletContext, InitParams
             EventListener listener = (EventListener) ctor.newInstance();
 
             addListener(listener);
+
+            listener_classnames_.add(className);
         } catch (Exception e) {
             log("addListener<N>: exception caught: " + e.toString());
         }
@@ -2599,8 +2749,8 @@ public class Context implements ServletContext, InitParams
 
         checkContextState();
 
-        for (int i = 0; i < SERVLET_LISTENER_TYPES.length; i++) {
-            Class<?> c = SERVLET_LISTENER_TYPES[i];
+        for (int i = 0; i < LISTENER_TYPES.length; i++) {
+            Class<?> c = LISTENER_TYPES[i];
             if (c.isAssignableFrom(t.getClass())) {
                 log("addListener<T>: assignable to " + c.getName());
             }
@@ -2622,20 +2772,40 @@ public class Context implements ServletContext, InitParams
         if (t instanceof ServletRequestAttributeListener) {
             req_attr_listeners_.add((ServletRequestAttributeListener) t);
         }
+
+        if (t instanceof HttpSessionAttributeListener) {
+            sess_attr_listeners_.add((HttpSessionAttributeListener) t);
+        }
+
+        if (t instanceof HttpSessionIdListener) {
+            sess_id_listeners_.add((HttpSessionIdListener) t);
+        }
+
+        if (t instanceof HttpSessionListener) {
+            sess_listeners_.add((HttpSessionListener) t);
+        }
     }
 
     @Override
     public void addListener(Class<? extends EventListener> listenerClass)
     {
-        log("addListener<C> " + listenerClass.getName());
+        String className = listenerClass.getName();
+        log("addListener<C> " + className);
 
         checkContextState();
+
+        if (listener_classnames_.contains(className)) {
+            log("addListener<C> " + className + " already added as listener");
+            return;
+        }
 
         try {
             Constructor<?> ctor = listenerClass.getConstructor();
             EventListener listener = (EventListener) ctor.newInstance();
 
             addListener(listener);
+
+            listener_classnames_.add(className);
         } catch (Exception e) {
             log("addListener<C>: exception caught: " + e.toString());
         }

@@ -35,6 +35,8 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
+import javax.servlet.SessionTrackingMode;
+import javax.servlet.SessionCookieConfig;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpServletRequest;
@@ -44,6 +46,7 @@ import javax.servlet.http.Part;
 
 import org.eclipse.jetty.util.MultiMap;
 import org.eclipse.jetty.util.UrlEncoded;
+import org.eclipse.jetty.util.StringUtil;
 
 import org.eclipse.jetty.server.CookieCutter;
 import org.eclipse.jetty.http.MimeTypes;
@@ -87,6 +90,12 @@ public class Request implements HttpServletRequest, DynamicPathRequest
 
     private InputStream inputStream = null;
     private BufferedReader reader = null;
+
+    private boolean request_session_id_parsed = false;
+    private String request_session_id = null;
+    private boolean request_session_id_from_cookie = false;
+    private boolean request_session_id_from_url = false;
+    private Session session = null;
 
     public Request(Context ctx, long req_info, long req) {
         context = ctx;
@@ -306,10 +315,38 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getRequestedSessionId()
     {
-        log("getRequestedSessionId");
+        trace("getRequestedSessionId");
 
-        /* TODO */
-        return null;
+        if (!request_session_id_parsed) {
+            parseRequestSessionId();
+        }
+
+        return request_session_id;
+    }
+
+    private void parseRequestSessionId()
+    {
+        request_session_id_parsed = true;
+
+        Cookie[] cookies = getCookies();
+        if (cookies == null) {
+            return;
+        }
+
+        if (context.getEffectiveSessionTrackingModes().contains(
+            SessionTrackingMode.COOKIE))
+        {
+            final String name = context.getSessionCookieConfig().getName();
+
+            for (Cookie c : cookies) {
+                if (c.getName().equals(name)) {
+                    request_session_id = c.getValue();
+                    request_session_id_from_cookie = true;
+
+                    return;
+                }
+            }
+        }
     }
 
     @Override
@@ -362,25 +399,60 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public HttpSession getSession()
     {
-        log("getSession");
+        trace("getSession");
 
-        // SESSION
-        HttpSession session =
-                ((Context)getServletContext()).getSessionManager().
-                        getSession(true,this, getResponse(req_info_ptr));
-        return session;
+        return getSession(true);
     }
 
     @Override
     public HttpSession getSession(boolean create)
     {
-        log("getSession: " + create);
+        trace("getSession: " + create);
 
-        // SESSION
-        HttpSession session =
-                ((Context)getServletContext()).getSessionManager().
-                        getSession(create, this, getResponse(req_info_ptr));
+        if (session != null) {
+            return session;
+        }
+
+        if (!request_session_id_parsed) {
+            parseRequestSessionId();
+        }
+
+        session = context.getSession(request_session_id);
+
+        if (session != null || !create) {
+            return session;
+        }
+
+        session = context.createSession();
+
+        if (context.getEffectiveSessionTrackingModes().contains(
+            SessionTrackingMode.COOKIE))
+        {
+            setSessionIdCookie();
+        }
+
         return session;
+    }
+
+    private void setSessionIdCookie()
+    {
+        SessionCookieConfig config = context.getSessionCookieConfig();
+
+        Cookie c = new Cookie(config.getName(), session.getId());
+
+        c.setComment(config.getComment());
+        if (!StringUtil.isBlank(config.getDomain())) {
+            c.setDomain(config.getDomain());
+        }
+
+        c.setHttpOnly(config.isHttpOnly());
+        if (!StringUtil.isBlank(config.getPath())) {
+            c.setPath(config.getPath());
+        }
+
+        c.setMaxAge(config.getMaxAge());
+
+        getResponse(req_info_ptr).addCookie(c);
     }
 
     @Override
@@ -394,34 +466,50 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public boolean isRequestedSessionIdFromCookie()
     {
-        log("isRequestedSessionIdFromCookie");
+        trace("isRequestedSessionIdFromCookie");
 
-        return false;
+        if (!request_session_id_parsed) {
+            parseRequestSessionId();
+        }
+
+        return request_session_id_from_cookie;
     }
 
     @Override
     @Deprecated
     public boolean isRequestedSessionIdFromUrl()
     {
-        log("isRequestedSessionIdFromUrl");
+        trace("isRequestedSessionIdFromUrl");
 
-        return false;
+        if (!request_session_id_parsed) {
+            parseRequestSessionId();
+        }
+
+        return request_session_id_from_url;
     }
 
     @Override
     public boolean isRequestedSessionIdFromURL()
     {
-        log("isRequestedSessionIdFromURL");
+        trace("isRequestedSessionIdFromURL");
 
-        return false;
+        if (!request_session_id_parsed) {
+            parseRequestSessionId();
+        }
+
+        return request_session_id_from_url;
     }
 
     @Override
     public boolean isRequestedSessionIdValid()
     {
-        log("isRequestedSessionIdValid");
+        trace("isRequestedSessionIdValid");
 
-        return false;
+        if (!request_session_id_parsed) {
+            parseRequestSessionId();
+        }
+
+        return context.isSessionIdValid(request_session_id);
     }
 
     @Override
@@ -528,7 +616,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public DispatcherType getDispatcherType()
     {
-        log("getDispatcherType");
+        trace("getDispatcherType");
 
         return dispatcher_type;
     }
@@ -759,7 +847,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getServerName()
     {
-        log("getServerName");
+        trace("getServerName");
 
         return getServerName(req_ptr);
     }
@@ -770,7 +858,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public int getServerPort()
     {
-        log("getServerPort");
+        trace("getServerPort");
 
         return getServerPort(req_ptr);
     }
@@ -869,9 +957,23 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String changeSessionId()
     {
-        log("changeSessionId");
+        trace("changeSessionId");
 
-        return null;
+        getSession(false);
+
+        if (session == null) {
+            return null;
+        }
+
+        context.changeSessionId(session);
+
+        if (context.getEffectiveSessionTrackingModes().contains(
+            SessionTrackingMode.COOKIE))
+        {
+            setSessionIdCookie();
+        }
+
+        return session.getId();
     }
 
     private void log(String msg)

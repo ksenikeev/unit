@@ -1,60 +1,67 @@
 package nginx.unit;
 
+import java.io.Serializable;
+
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpSession;
-import javax.servlet.http.HttpSessionContext;
-import java.io.Serializable;
-import java.util.*;
+import javax.servlet.http.HttpSessionAttributeListener;
+import javax.servlet.http.HttpSessionBindingEvent;
+import javax.servlet.http.HttpSessionBindingListener;
+
+import java.util.Collections;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Andrey Kazankov
  */
-public class Session implements HttpSession, Serializable {
-
-    private Map<String, Object> attributesMap = new HashMap<>();
-    private long creationTime = new Date().getTime();
+public class Session implements HttpSession, Serializable
+{
+    private final Map<String, Object> attributes = new HashMap<>();
+    private final long creation_time = new Date().getTime();
+    private long last_access_time = 0;
+    private long access_time = creation_time;
     private String id;
-    private Context context;
-    boolean isNewSession = false;
+    private final Context context;
+    private boolean is_new = true;
+    private final HttpSessionAttributeListener attr_listener;
 
-    public Session(Context context)
+    public Session(Context context, String id, HttpSessionAttributeListener al)
     {
-        SessionIdGenerator generator =  new UUIDSessionIdGenerator();
-        generator.init();
-        this.id = generator.generate();
-        isNewSession = true;
+        this.id = id;
         this.context = context;
+        attr_listener = al;
     }
 
-
-    public Session(SessionIdGenerator idGenerator, Context context)
+    public void setId(String id)
     {
-        this.id = idGenerator.generate();
-        this.context = context;
+        this.id = id;
     }
 
     @Override
     public long getCreationTime()
     {
-        return creationTime;
+        return creation_time;
     }
 
     @Override
     public String getId()
     {
-        return  id;
+        return id;
     }
 
     @Override
     public long getLastAccessedTime()
     {
-        return 0;
+        return last_access_time;
     }
 
     @Override
     public ServletContext getServletContext()
     {
-        return null;
+        return context;
     }
 
     @Override
@@ -69,8 +76,9 @@ public class Session implements HttpSession, Serializable {
         return 0;
     }
 
+    @Deprecated
     @Override
-    public HttpSessionContext getSessionContext()
+    public javax.servlet.http.HttpSessionContext getSessionContext()
     {
         return null;
     }
@@ -78,7 +86,9 @@ public class Session implements HttpSession, Serializable {
     @Override
     public Object getAttribute(String s)
     {
-        return attributesMap.get(s);
+        synchronized (attributes) {
+            return attributes.get(s);
+        }
     }
 
     @Deprecated
@@ -91,21 +101,67 @@ public class Session implements HttpSession, Serializable {
     @Override
     public Enumeration<String> getAttributeNames()
     {
-        return Collections.enumeration(attributesMap.keySet());
+        synchronized (attributes) {
+            return Collections.enumeration(attributes.keySet());
+        }
     }
 
     @Deprecated
     @Override
     public String[] getValueNames()
     {
-        //(String[]) Collections.list(getAttributeNames()).toArray()
-        return attributesMap.keySet().toArray(new String[attributesMap.keySet().size()]);
+        synchronized (attributes) {
+            return attributes.keySet().toArray(new String[attributes.keySet().size()]);
+        }
     }
 
     @Override
     public void setAttribute(String s, Object o)
     {
-        attributesMap.put(s,o);
+        Object old;
+
+        if (o != null && o instanceof HttpSessionBindingListener) {
+            HttpSessionBindingListener l = (HttpSessionBindingListener) o;
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s);
+
+            l.valueBound(e);
+        }
+
+        synchronized (attributes) {
+            if (o != null) {
+                old = attributes.put(s, o);
+            } else {
+                old = attributes.remove(s);
+            }
+        }
+
+        if (old != null && old instanceof HttpSessionBindingListener) {
+            HttpSessionBindingListener l = (HttpSessionBindingListener) old;
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s);
+
+            l.valueUnbound(e);
+        }
+
+        if (attr_listener == null) {
+            return;
+        }
+
+        if (o == null) {
+            if (old != null) {
+                HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s, old);
+                attr_listener.attributeRemoved(e);
+            }
+
+            return;
+        }
+
+        if (old != null) {
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s, old);
+            attr_listener.attributeReplaced(e);
+        } else {
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s, o);
+            attr_listener.attributeAdded(e);
+        }
     }
 
     @Deprecated
@@ -118,7 +174,25 @@ public class Session implements HttpSession, Serializable {
     @Override
     public void removeAttribute(String s)
     {
-        attributesMap.remove(s);
+        Object o;
+
+        synchronized (attributes) {
+            o = attributes.remove(s);
+        }
+
+        if (o != null && o instanceof HttpSessionBindingListener) {
+            HttpSessionBindingListener l = (HttpSessionBindingListener) o;
+            HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s);
+
+            l.valueUnbound(e);
+        }
+
+        if (attr_listener == null || o == null) {
+            return;
+        }
+
+        HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, s, o);
+        attr_listener.attributeRemoved(e);
     }
 
     @Deprecated
@@ -128,43 +202,41 @@ public class Session implements HttpSession, Serializable {
         removeAttribute(s);
     }
 
-
     @Override
     public void invalidate()
     {
-        context.getSessionManager().invalidate(this);
+        context.invalidateSession(this);
+
+        unboundAttributes();
+    }
+
+    private void unboundAttributes()
+    {
+        for (Map.Entry<String, Object> a : attributes.entrySet()) {
+            Object o = a.getValue();
+            if (o != null && o instanceof HttpSessionBindingListener) {
+                HttpSessionBindingListener l = (HttpSessionBindingListener) o;
+                HttpSessionBindingEvent e = new HttpSessionBindingEvent(this, a.getKey());
+
+                l.valueUnbound(e);
+            }
+        }
+
+        attributes.clear();
     }
 
     @Override
     public boolean isNew()
     {
-        return isNewSession;
+        return is_new;
     }
 
-    public void setIsNewSession(boolean b) {
-        isNewSession = b;
-    }
+    public void accessed() {
+        synchronized (this) {
+            is_new = false;
 
-    public interface SessionIdGenerator
-    {
-        void init();
-        String generate();
-    }
-
-
-    public class UUIDSessionIdGenerator implements SessionIdGenerator
-    {
-
-        @Override
-        public void init()
-        {
-            // initialization id generator
-        }
-
-        @Override
-        public String generate()
-        {
-            return UUID.randomUUID().toString();
+            last_access_time = access_time;
+            access_time = new Date().getTime();
         }
     }
 }

@@ -61,5 +61,56 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual(resp['headers']['X-Var-2'], 'true', 'POST variables 2')
         self.assertEqual(resp['headers']['X-Var-3'], 'false', 'POST variables 3')
 
+    def test_java_application_session(self):
+        self.load('session')
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/?var1=val1')
+
+        session_id = resp['headers']['X-Session-Id']
+
+        self.assertEqual(resp['headers']['X-Var-1'], 'null', 'GET variables')
+        self.assertEqual(resp['headers']['X-Session-New'], 'true', 'GET variables 2')
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Cookie': 'JSESSIONID=' + session_id,
+            'Connection': 'close'
+        }, url='/?var1=val2')
+
+        self.assertEqual(resp['headers']['X-Var-1'], 'val1', 'GET variables')
+        self.assertEqual(resp['headers']['X-Session-New'], 'false', 'GET variables 2')
+
+    def test_java_application_session_listeners(self):
+        self.load('session_listeners')
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/test?var1=val1')
+
+        session_id = resp['headers']['X-Session-Id']
+
+        self.assertEqual(resp['headers']['X-Session-Created'], session_id, 'session creation')
+        self.assertEqual(resp['headers']['X-Attr-Added'], 'var1=val1', 'attribute added')
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Cookie': 'JSESSIONID=' + session_id,
+            'Connection': 'close'
+        }, url='/?var1=val2')
+
+        self.assertEqual(resp['headers']['X-Attr-Replaced'], 'var1=val1', 'attribute replaced')
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Cookie': 'JSESSIONID=' + session_id,
+            'Connection': 'close'
+        }, url='/')
+
+        self.assertEqual(resp['headers']['X-Attr-Removed'], 'var1=val2', 'attribute removed')
+
 if __name__ == '__main__':
     unittest.main()

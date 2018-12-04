@@ -14,7 +14,9 @@ import javax.servlet.SessionCookieConfig;
  */
 public class UnitSessionCookieConfig implements SessionCookieConfig {
 
-    private String name = SessionManager.JUNIT_SESSION_ID_COOKIE_NAME;
+    private static final String default_name = "JSESSIONID";
+
+    private String name = default_name;
     private String domain;
     private String path;
     private String comment;

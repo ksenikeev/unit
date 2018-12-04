@@ -117,13 +117,14 @@ nxt_java_newURLClassLoader_parent(JNIEnv *env, int url_count, char **urls,
 jobjectArray
 nxt_java_newURls(JNIEnv *env, int url_count, char **urls)
 {
+    int i;
     jobjectArray jurls = (*env)->NewObjectArray(env, url_count,
                                                 nxt_java_URL_class, NULL);
     if (jurls == NULL) {
         return NULL;
     }
 
-    for (int i = 0; i < url_count; i++) {
+    for (i = 0; i < url_count; i++) {
         jstring surl = (*env)->NewStringUTF(env, urls[i]);
         if (surl == NULL) {
             return NULL;
