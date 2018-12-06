@@ -101,5 +101,15 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual(headers['X-Attr-Removed'], 'var1=val2',
             'attribute remove')
 
+    def test_java_application_jsp(self):
+        self.load('jsp')
+
+        resp = self.post(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/index.jsp')
+
+        self.assertEqual(resp['headers']['X-Unit-JSP'], 'ok', 'JSP Ok header')
+
 if __name__ == '__main__':
     unittest.main()

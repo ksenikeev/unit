@@ -13,7 +13,7 @@
 int nxt_java_initContext(JNIEnv *env, jobject cl);
 
 jobject nxt_java_startContext(JNIEnv *env, const char *webapp,
-    int classpath_count, char **classpath_arr);
+    jobject classpaths, jobject jsps);
 
 void nxt_java_service(JNIEnv *env, jobject ctx, jobject jreq, jobject jresp);
 
