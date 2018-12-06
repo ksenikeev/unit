@@ -596,15 +596,17 @@ class TestUnitApplicationNode(TestUnitApplicationProto):
 class TestUnitApplicationJava(TestUnitApplicationProto):
     def load(self, script, name='app'):
 
-        if not os.path.isdir(self.testdir + '/java/WEB-INF/classes'):
-            os.makedirs(self.testdir + '/java/WEB-INF/classes')
+        web_inf_path = self.testdir + '/java/WEB-INF'
+
+        if not os.path.isdir(web_inf_path + '/classes'):
+            os.makedirs(web_inf_path + '/classes')
 
         if os.path.isfile(self.current_dir + '/java/' + script + '/web.xml'):
             shutil.copy2(self.current_dir + '/java/' + script + '/web.xml',
-                self.testdir + '/java/WEB-INF/')
+                web_inf_path + '/')
 
         process = subprocess.Popen(['javac',
-            '-d', self.testdir + '/java/WEB-INF/classes',
+            '-d', web_inf_path + '/classes',
             '-classpath', self.pardir + '/build/javax.servlet-api-3.1.0.jar',
             self.current_dir + '/java/' + script + '/' + name + '.java'])
         process.communicate()
