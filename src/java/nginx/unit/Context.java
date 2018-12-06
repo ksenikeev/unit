@@ -86,6 +86,8 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.annotation.WebFilter;
 import javax.servlet.annotation.WebListener;
 import javax.servlet.descriptor.JspConfigDescriptor;
+import javax.servlet.descriptor.JspPropertyGroupDescriptor;
+import javax.servlet.descriptor.TaglibDescriptor;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -100,7 +102,6 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.eclipse.jetty.http.MimeTypes;
-import org.apache.jasper.servlet.JspServlet;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -114,6 +115,9 @@ public class Context implements ServletContext, InitParams
     public final static int SERVLET_MAJOR_VERSION = 3;
     public final static int SERVLET_MINOR_VERSION = 1;
 
+    private final static String JSP_SERVLET = "org.apache.jasper.servlet.JspServlet";
+    private final static String JASPER_INITIALIZER = "org.apache.jasper.servlet.JasperInitializer";
+
     private String context_path_ = "";
     private String server_info_ = "unit";
     private String app_version_ = "";
@@ -123,6 +127,7 @@ public class Context implements ServletContext, InitParams
     private boolean ctx_initialized_ = false;
 
     private ClassLoader loader_;
+    private ClassLoader jsp_loader_;
     private File webapp_;
     private File extracted_dir_;
 
@@ -178,7 +183,7 @@ public class Context implements ServletContext, InitParams
     private final SessionCookieConfig session_cookie_config_ = new UnitSessionCookieConfig();
     private final Set<SessionTrackingMode> default_session_tracking_modes_ = new HashSet<>();
     private Set<SessionTrackingMode> session_tracking_modes_ = default_session_tracking_modes_;
-    private int session_timeout_ = 60 * 60 * 1000;
+    private int session_timeout_ = 60;
 
     private final Map<String, Session> sessions_ = new HashMap<>();
 
@@ -276,11 +281,12 @@ public class Context implements ServletContext, InitParams
         }
     }
 
-    public static Context start(String webapp, URL[] classpaths) throws Exception
+    public static Context start(String webapp, URL[] classpaths, URL[] jsps)
+        throws Exception
     {
         Context ctx = new Context();
 
-        ctx.loadApp(webapp, classpaths);
+        ctx.loadApp(webapp, classpaths, jsps);
         ctx.initialized();
 
         return ctx;
@@ -291,7 +297,8 @@ public class Context implements ServletContext, InitParams
         default_session_tracking_modes_.add(SessionTrackingMode.COOKIE);
     }
 
-    public void loadApp(String webapp, URL[] classpaths) throws Exception
+    public void loadApp(String webapp, URL[] classpaths, URL[] jsps)
+        throws Exception
     {
         File root = new File(webapp);
         if (!root.exists()) {
@@ -299,15 +306,11 @@ public class Context implements ServletContext, InitParams
                 "Unable to determine code source archive from " + root);
         }
 
-
-        URLClassLoader ucl = (URLClassLoader) Thread.currentThread().getContextClassLoader();
-
-        for (URL u : ucl.getURLs()) {
-            trace("URLs: " + u);
-        }
-
-
         ArrayList<URL> url_list = new ArrayList<>();
+
+        for (URL u : classpaths) {
+            url_list.add(u);
+        }
 
         if (!root.isDirectory()) {
             root = extractWar(root);
@@ -328,10 +331,6 @@ public class Context implements ServletContext, InitParams
             for (File l : libs) {
                 url_list.add(new URL("file:" + l.getAbsolutePath()));
             }
-        }
-
-        for (URL u : classpaths) {
-            url_list.add(u);
         }
 
         URL[] urls = new URL[url_list.size()];
@@ -387,9 +386,20 @@ public class Context implements ServletContext, InitParams
             }
 
             if (pattern2servlet_.get("*.jsp") == null) {
+                jsp_loader_ = new URLClassLoader(jsps, loader_);
+
+                trace("startup JasperInitializer");
+
+                Class<?> ji_cls = jsp_loader_.loadClass(JASPER_INITIALIZER);
+                Constructor<?> ji_ctor = ji_cls.getConstructor();
+                ServletContainerInitializer ji = (ServletContainerInitializer) ji_ctor.newInstance();
+                ji.onStartup(Collections.emptySet(), this);
+
                 ServletReg jsp_servlet = new JspServletReg();
                 servlets_.add(jsp_servlet);
+
                 parseURLPattern("*.jsp", jsp_servlet);
+                parseURLPattern("*.jspx", jsp_servlet);
             }
 
             Collections.sort(prefix_patterns_, Collections.reverseOrder());
@@ -830,9 +840,6 @@ public class Context implements ServletContext, InitParams
 
         metadata_complete_ = doc_elem.getAttribute("metadata-complete").equals("true");
         app_version_ = doc_elem.getAttribute("version");
-        if (compareVersion(app_version_, "3.0") < 0) {
-            metadata_complete_ = true;
-        }
 
         NodeList welcome_file_lists = doc_elem.getElementsByTagName("welcome-file-list");
 
@@ -1075,6 +1082,39 @@ public class Context implements ServletContext, InitParams
                 break;
             }
         }
+
+        NodeList jsp_configs = doc_elem.getElementsByTagName("jsp-config");
+
+        for (int i = 0; i < jsp_configs.getLength(); i++) {
+            Element jsp_config_el = (Element) jsp_configs.item(i);
+
+            NodeList jsp_nodes = jsp_config_el.getChildNodes();
+
+            for(int j = 0; j < jsp_nodes.getLength(); j++) {
+                Node jsp_node = jsp_nodes.item(j);
+                String tag_name = jsp_node.getNodeName();
+
+                if (tag_name.equals("taglib")) {
+                    NodeList tl_nodes = ((Element) jsp_node).getChildNodes();
+                    Taglib tl = new Taglib(tl_nodes);
+
+                    trace("add taglib");
+
+                    taglibs_.add(tl);
+                    continue;
+                }
+
+                if (tag_name.equals("jsp-property-group")) {
+                    NodeList jpg_nodes = ((Element) jsp_node).getChildNodes();
+                    JspPropertyGroup conf = new JspPropertyGroup(jpg_nodes);
+
+                    trace("add prop group");
+
+                    prop_groups_.add(conf);
+                    continue;
+                }
+            }
+        }
     }
 
     private static int compareVersion(String ver1, String ver2)
@@ -1175,12 +1215,13 @@ public class Context implements ServletContext, InitParams
     private void scanClasses(ScanResult scan_res)
         throws ReflectiveOperationException
     {
-        ClassInfoList filters = scan_res.getClassesImplementing(Filter.class.getName());
+        ClassInfoList filters = scan_res.getClassesWithAnnotation(WebFilter.class.getName());
 
         for (ClassInfo ci : filters) {
             if (ci.isInterface()
                 || ci.isAnnotation()
-                || ci.isAbstract())
+                || ci.isAbstract()
+                || !ci.implementsInterface(Filter.class.getName()))
             {
                 trace("scanClasses: ignoring Filter impl: " + ci.getName());
                 continue;
@@ -1189,6 +1230,11 @@ public class Context implements ServletContext, InitParams
             trace("scanClasses: found Filter class: " + ci.getName());
 
             Class<?> cls = ci.loadClass();
+            if (!Filter.class.isAssignableFrom(cls)) {
+                trace("scanClasses: " + ci.getName() + " cannot be assigned to Filter");
+                continue;
+            }
+
             WebFilter ann = cls.getAnnotation(WebFilter.class);
 
             if (ann == null) {
@@ -1235,12 +1281,13 @@ public class Context implements ServletContext, InitParams
             reg.setAsyncSupported(ann.asyncSupported());
         }
 
-        ClassInfoList servlets = scan_res.getSubclasses(HttpServlet.class.getName());
+        ClassInfoList servlets = scan_res.getClassesWithAnnotation(WebServlet.class.getName());
 
         for (ClassInfo ci : servlets) {
             if (ci.isInterface()
                 || ci.isAnnotation()
-                || ci.isAbstract())
+                || ci.isAbstract()
+                || !ci.extendsSuperclass(HttpServlet.class.getName()))
             {
                 trace("scanClasses: ignoring HttpServlet subclass: " + ci.getName());
                 continue;
@@ -1249,6 +1296,11 @@ public class Context implements ServletContext, InitParams
             trace("scanClasses: found HttpServlet class: " + ci.getName());
 
             Class<?> cls = ci.loadClass();
+            if (!HttpServlet.class.isAssignableFrom(cls)) {
+                trace("scanClasses: " + ci.getName() + " cannot be assigned to HttpFilter");
+                continue;
+            }
+
             WebServlet ann = cls.getAnnotation(WebServlet.class);
 
             if (ann == null) {
@@ -1689,9 +1741,9 @@ public class Context implements ServletContext, InitParams
 
     private class JspServletReg extends ServletReg
     {
-        public JspServletReg()
+        public JspServletReg() throws ClassNotFoundException
         {
-            super("jsp", new JspServlet());
+            super("jsp", jsp_loader_.loadClass(JSP_SERVLET));
         }
 
         @Override
@@ -1699,7 +1751,7 @@ public class Context implements ServletContext, InitParams
             throws ServletException, IOException
         {
             ClassLoader old = Thread.currentThread().getContextClassLoader();
-            Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+            Thread.currentThread().setContextClassLoader(jsp_loader_);
 
             try {
                 super.service(request, response);
@@ -2055,7 +2107,11 @@ public class Context implements ServletContext, InitParams
                 ServletContextEvent event = new ServletContextEvent(this);
                 for (ServletContextListener listener : ctx_listeners_)
                 {
-                    listener.contextInitialized(event);
+                    try {
+                        listener.contextInitialized(event);
+                    } catch(AbstractMethodError e) {
+                        log("initialized: AbstractMethodError exception caught: " + e);
+                    }
                     destroy_listeners_.add(listener);
                 }
             }
@@ -2064,7 +2120,7 @@ public class Context implements ServletContext, InitParams
                 try {
                     sr.startup();
                 } catch(ServletException e) {
-                    System.err.println("initialized: exception caught: " + e.toString());
+                    log("initialized: exception caught: " + e);
                 }
             }
 
@@ -2072,7 +2128,7 @@ public class Context implements ServletContext, InitParams
                 try {
                     fr.init();
                 } catch(ServletException e) {
-                    System.err.println("initialized: exception caught: " + e.toString());
+                    log("initialized: exception caught: " + e);
                 }
             }
 
@@ -2216,7 +2272,11 @@ public class Context implements ServletContext, InitParams
 
         File f = new File(webapp_, path.substring(1));
 
-        return f.getAbsolutePath();
+        if (f.exists()) {
+            return f.getAbsolutePath();
+        }
+
+        return null;
     }
 
     @Override
@@ -2224,7 +2284,13 @@ public class Context implements ServletContext, InitParams
     {
         trace("getResource for " + path);
 
-        return new URL("file:" + getRealPath(path));
+        File f = new File(webapp_, path.substring(1));
+
+        if (f.exists()) {
+            return new URL("file:" + f.getAbsolutePath());
+        }
+
+        return null;
     }
 
     @Override
@@ -2246,8 +2312,30 @@ public class Context implements ServletContext, InitParams
     @Override
     public Set<String> getResourcePaths(String path)
     {
-        log("getResourcePaths for " + path);
-        return null;
+        trace("getResourcePaths for " + path);
+
+        File dir = new File(webapp_, path.substring(1));
+        File[] list = dir.listFiles();
+
+        if (list == null) {
+            return null;
+        }
+
+        Set<String> res = new HashSet<>();
+        Path root = webapp_.toPath();
+
+        for (File f : list) {
+            String r = "/" + root.relativize(f.toPath());
+            if (f.isDirectory()) {
+                r += "/";
+            }
+
+            trace("getResourcePaths: " + r);
+
+            res.add(r);
+        }
+
+        return res;
     }
 
     @Override
@@ -2505,6 +2593,14 @@ public class Context implements ServletContext, InitParams
         }
 
         return reg;
+    }
+
+    @Override
+    public ServletRegistration.Dynamic addJspFile(String jspName, String jspFile)
+    {
+        log("addJspFile: " + jspName + " " + jspFile);
+
+        return null;
     }
 
     @Override
@@ -2850,12 +2946,34 @@ public class Context implements ServletContext, InitParams
         return SERVLET_MINOR_VERSION;
     }
 
+    private final List<TaglibDescriptor> taglibs_ = new ArrayList<>();
+    private final List<JspPropertyGroupDescriptor> prop_groups_ = new ArrayList<>();
+
+    private class JspConfig implements JspConfigDescriptor
+    {
+        @Override
+        public Collection<TaglibDescriptor> getTaglibs()
+        {
+            trace("getTaglibs");
+            return taglibs_;
+        }
+
+        @Override
+        public Collection<JspPropertyGroupDescriptor> getJspPropertyGroups()
+        {
+            trace("getJspPropertyGroups");
+            return prop_groups_;
+        }
+    }
+
+    private final JspConfig jsp_config_ = new JspConfig();
+
     @Override
     public JspConfigDescriptor getJspConfigDescriptor()
     {
-        log("getJspConfigDescriptor");
-        //LOG.warn(__unimplmented);
-        return null;
+        trace("getJspConfigDescriptor");
+
+        return jsp_config_;
     }
 
     @Override
@@ -2870,6 +2988,50 @@ public class Context implements ServletContext, InitParams
     {
         log("getVirtualServerName");
         return null;
+    }
+
+    @Override
+    public int getSessionTimeout()
+    {
+        trace("getSessionTimeout");
+
+        return session_timeout_;
+    }
+
+    @Override
+    public void setSessionTimeout(int sessionTimeout)
+    {
+        trace("setSessionTimeout: " + sessionTimeout);
+
+        session_timeout_ = sessionTimeout;
+    }
+
+    @Override
+    public String getRequestCharacterEncoding()
+    {
+        log("getRequestCharacterEncoding");
+
+        return null;
+    }
+
+    @Override
+    public void setRequestCharacterEncoding(String encoding)
+    {
+        log("setRequestCharacterEncoding: " + encoding);
+    }
+
+    @Override
+    public String getResponseCharacterEncoding()
+    {
+        log("getResponseCharacterEncoding");
+
+        return null;
+    }
+
+    @Override
+    public void setResponseCharacterEncoding(String encoding)
+    {
+        log("setResponseCharacterEncoding: " + encoding);
     }
 
     public void requestAttributeAdded(Request r, String name, Object value)

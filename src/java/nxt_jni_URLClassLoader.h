@@ -17,7 +17,7 @@ jobject nxt_java_newURLClassLoader(JNIEnv *env, int url_count, char **urls);
 jobject nxt_java_newURLClassLoader_parent(JNIEnv *env, int url_count,
     char **urls, jobject parent);
 
-jobjectArray nxt_java_newURls(JNIEnv *env, int url_count, char **urls);
+jobjectArray nxt_java_newURLs(JNIEnv *env, int url_count, char **urls);
 
 jclass nxt_java_loadClass(JNIEnv *env, jobject cl, const char *name);
 

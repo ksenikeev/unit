@@ -596,18 +596,40 @@ class TestUnitApplicationNode(TestUnitApplicationProto):
 class TestUnitApplicationJava(TestUnitApplicationProto):
     def load(self, script, name='app'):
 
-        if not os.path.isdir(self.testdir + '/java/WEB-INF/classes'):
-            os.makedirs(self.testdir + '/java/WEB-INF/classes')
+        app_path = self.testdir + '/java'
+        web_inf_path = app_path + '/WEB-INF/'
+        classes_path = web_inf_path + 'classes/'
 
-        if os.path.isfile(self.current_dir + '/java/' + script + '/web.xml'):
-            shutil.copy2(self.current_dir + '/java/' + script + '/web.xml',
-                self.testdir + '/java/WEB-INF/')
+        script_path = self.current_dir + '/java/' + script + '/'
 
-        process = subprocess.Popen(['javac',
-            '-d', self.testdir + '/java/WEB-INF/classes',
-            '-classpath', self.pardir + '/build/javax.servlet-api-3.1.0.jar',
-            self.current_dir + '/java/' + script + '/' + name + '.java'])
-        process.communicate()
+        if not os.path.isdir(app_path):
+            os.makedirs(app_path)
+
+        src = []
+
+        for f in os.listdir(script_path):
+            if f.endswith('.java'):
+                src.append(script_path + f)
+                continue
+
+            if f == 'web.xml':
+                if not os.path.isdir(web_inf_path):
+                    os.makedirs(web_inf_path)
+
+                shutil.copy2(script_path + f, web_inf_path)
+            else:
+                shutil.copy2(script_path + f, app_path)
+
+        if src:
+            if not os.path.isdir(classes_path):
+                os.makedirs(classes_path)
+
+            javac = ['javac', '-d', classes_path, '-classpath',
+                self.pardir + '/build/tomcat-servlet-api-9.0.13.jar']
+            javac.extend(src)
+
+            process = subprocess.Popen(javac)
+            process.communicate()
 
         self.conf({
             "listeners": {
@@ -619,8 +641,8 @@ class TestUnitApplicationJava(TestUnitApplicationProto):
                 script: {
                     "type": "java",
                     "processes": { "spare": 0 },
-                    "working_directory": self.current_dir + '/java/' + script,
-                    "webapp": self.testdir + '/java'
+                    "working_directory": script_path,
+                    "webapp": app_path
                 }
             }
         })

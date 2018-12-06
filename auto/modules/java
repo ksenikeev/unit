@@ -219,19 +219,18 @@ cat << END > $NXT_JAVA_JARS
 static const char *nxt_java_system_jars[] = {
 END
 
-NXT_JAR_NAME=javax.servlet-api
-NXT_JAR_VERSION=3.1.0
-NXT_JAR_NAMESPACE=javax/servlet/
+NXT_TOMCAT_VERSION=9.0.13
+
+NXT_JAR_VERSION=$NXT_TOMCAT_VERSION
+
+NXT_JAR_NAME=tomcat-servlet-api
+NXT_JAR_NAMESPACE=org/apache/tomcat/
 . auto/modules/java_get_jar
 
-NXT_JAR_NAME=javax.el-api
-NXT_JAR_VERSION=3.0.0
-NXT_JAR_NAMESPACE=javax/el/
+NXT_JAR_NAME=tomcat-el-api
 . auto/modules/java_get_jar
 
-NXT_JAR_NAME=javax.servlet.jsp-api
-NXT_JAR_VERSION=2.3.3
-NXT_JAR_NAMESPACE=javax/servlet/jsp/
+NXT_JAR_NAME=tomcat-jsp-api
 . auto/modules/java_get_jar
 
 cat << END >> $NXT_JAVA_JARS
@@ -259,23 +258,37 @@ NXT_JAR_VERSION=4.4.11
 NXT_JAR_NAMESPACE=io/github/classgraph/
 . auto/modules/java_get_jar
 
-NXT_JAR_NAME=jasper
-NXT_JAR_VERSION=6.0.53
+cat << END >> $NXT_JAVA_JARS
+    NULL
+};
+
+static const char *nxt_java_jsp_jars[] = {
+END
+
+NXT_JAR_VERSION=$NXT_TOMCAT_VERSION
+
+NXT_JAR_NAME=tomcat-jasper
 NXT_JAR_NAMESPACE=org/apache/tomcat/
 . auto/modules/java_get_jar
 
-NXT_JAR_NAME=jasper-el
+NXT_JAR_NAME=tomcat-jasper-el
 . auto/modules/java_get_jar
 
-NXT_JAR_NAME=juli
+NXT_JAR_NAME=tomcat-juli
 . auto/modules/java_get_jar
 
-NXT_JAR_NAME=coyote
+NXT_JAR_NAME=tomcat-api
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=tomcat-util-scan
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=tomcat-util
 . auto/modules/java_get_jar
 
 NXT_JAR_NAME=ecj
-NXT_JAR_VERSION=4.3.1
-NXT_JAR_NAMESPACE=org/eclipse/jdt/core/compiler/
+NXT_JAR_VERSION=3.13.102
+NXT_JAR_NAMESPACE=org/eclipse/jdt/
 . auto/modules/java_get_jar
 
 cat << END >> $NXT_JAVA_JARS
@@ -355,10 +368,12 @@ NXT_JAVA_CLASSES = \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/HeadersEnumeration.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/InitParams.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/InputStream.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/JspPropertyGroup.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/OutputStream.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Request.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Response.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Session.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Taglib.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/UnitSessionCookieConfig.class \\
 
 \$(NXT_JAVA_CLASSES): $NXT_BUILD_DIR/$NXT_JAVA_MODULE/.classes
