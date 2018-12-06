@@ -328,15 +328,15 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         goto env_failed;
     }
 
-    jobject jsps = nxt_java_newURls(env, jsp_jars_count, jsp_jars);
+    jobject jsps = nxt_java_newURLs(env, jsp_jars_count, jsp_jars);
     if (jsps == NULL) {
-        nxt_alert(task, "nxt_java_newURls failed");
+        nxt_alert(task, "nxt_java_newURLs failed");
         goto env_failed;
     }
 
-    jobject classpaths = nxt_java_newURls(env, classpath_count, classpath_arr);
+    jobject classpaths = nxt_java_newURLs(env, classpath_count, classpath_arr);
     if (jsps == NULL) {
-        nxt_alert(task, "nxt_java_newURls failed");
+        nxt_alert(task, "nxt_java_newURLs failed");
         goto env_failed;
     }
 

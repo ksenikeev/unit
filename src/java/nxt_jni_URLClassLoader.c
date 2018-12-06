@@ -89,7 +89,7 @@ failed:
 jobject
 nxt_java_newURLClassLoader(JNIEnv *env, int url_count, char **urls)
 {
-    jobjectArray jurls = nxt_java_newURls(env, url_count, urls);
+    jobjectArray jurls = nxt_java_newURLs(env, url_count, urls);
 
     if (jurls == NULL) {
         return NULL;
@@ -103,7 +103,7 @@ jobject
 nxt_java_newURLClassLoader_parent(JNIEnv *env, int url_count, char **urls,
     jobject parent)
 {
-    jobjectArray jurls = nxt_java_newURls(env, url_count, urls);
+    jobjectArray jurls = nxt_java_newURLs(env, url_count, urls);
 
     if (jurls == NULL) {
         return NULL;
@@ -115,7 +115,7 @@ nxt_java_newURLClassLoader_parent(JNIEnv *env, int url_count, char **urls,
 }
 
 jobjectArray
-nxt_java_newURls(JNIEnv *env, int url_count, char **urls)
+nxt_java_newURLs(JNIEnv *env, int url_count, char **urls)
 {
     int i;
     jobjectArray jurls = (*env)->NewObjectArray(env, url_count,
