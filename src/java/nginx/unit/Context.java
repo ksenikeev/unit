@@ -183,7 +183,7 @@ public class Context implements ServletContext, InitParams
     private final SessionCookieConfig session_cookie_config_ = new UnitSessionCookieConfig();
     private final Set<SessionTrackingMode> default_session_tracking_modes_ = new HashSet<>();
     private Set<SessionTrackingMode> session_tracking_modes_ = default_session_tracking_modes_;
-    private int session_timeout_ = 60 * 60 * 1000;
+    private int session_timeout_ = 60;
 
     private final Map<String, Session> sessions_ = new HashMap<>();
 
@@ -2993,15 +2993,17 @@ public class Context implements ServletContext, InitParams
     @Override
     public int getSessionTimeout()
     {
-        log("getSessionTimeout");
+        trace("getSessionTimeout");
 
-        return 0;
+        return session_timeout_;
     }
 
     @Override
     public void setSessionTimeout(int sessionTimeout)
     {
-        log("setSessionTimeout: " + sessionTimeout);
+        trace("setSessionTimeout: " + sessionTimeout);
+
+        session_timeout_ = sessionTimeout;
     }
 
     @Override
