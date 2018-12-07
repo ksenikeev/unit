@@ -191,7 +191,7 @@ public class Context implements ServletContext, InitParams
     private static final String WEB_INF_CLASSES = WEB_INF + "classes/";
     private static final String WEB_INF_LIB = WEB_INF + "lib/";
 
-    private class PrefixPattern implements Comparable
+    private class PrefixPattern implements Comparable<PrefixPattern>
     {
         public final String pattern;
         public final ServletReg servlet;
@@ -210,9 +210,9 @@ public class Context implements ServletContext, InitParams
         }
 
         @Override
-        public int compareTo(Object p)
+        public int compareTo(PrefixPattern p)
         {
-            return pattern.length() - ((PrefixPattern) p).pattern.length();
+            return p.pattern.length() - pattern.length();
         }
     }
 
@@ -402,7 +402,7 @@ public class Context implements ServletContext, InitParams
                 parseURLPattern("*.jspx", jsp_servlet);
             }
 
-            Collections.sort(prefix_patterns_, Collections.reverseOrder());
+            Collections.sort(prefix_patterns_);
         } finally {
             Thread.currentThread().setContextClassLoader(old);
         }
@@ -547,8 +547,12 @@ public class Context implements ServletContext, InitParams
             if (p.match(path)) {
                 trace("findServlet: '" + path + "' matched prefix pattern '" + p.pattern + "'");
                 if (req != null) {
-                    req.setServletPath(p.pattern,
-                        path.substring(p.pattern.length()));
+                    if (p.pattern.length() == path.length()) {
+                        req.setServletPath(p.pattern, null);
+                    } else {
+                        req.setServletPath(p.pattern,
+                            path.substring(p.pattern.length()));
+                    }
                 }
                 return p.servlet;
             }
