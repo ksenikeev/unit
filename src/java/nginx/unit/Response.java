@@ -8,6 +8,7 @@ import java.lang.IllegalArgumentException;
 import java.lang.String;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import java.text.SimpleDateFormat;
 
@@ -19,18 +20,27 @@ import java.util.Locale;
 import java.util.TimeZone;
 import java.util.Vector;
 
+import javax.servlet.DispatcherType;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.util.StringUtil;
 
 public class Response implements HttpServletResponse {
 
     private long req_info_ptr;
 
-    private String characterEncoding = "ISO-8859-1";
+    private final String defaultCharacterEncoding = "iso-8859-1";
+    private String characterEncoding = defaultCharacterEncoding;
+    private String contentType = null;
+
+    private final Charset ISO_8859_1 = StandardCharsets.ISO_8859_1;
+    private final Charset UTF_8 = StandardCharsets.UTF_8;
+
+    private final String CONTENT_TYPE = "Content-Type";
 
     /**
      * The only date format permitted when generating HTTP headers.
@@ -167,7 +177,9 @@ public class Response implements HttpServletResponse {
         trace("addDateHeader: " + name + ": " + date);
 
         String value = dateToString(date);
-        addHeader(req_info_ptr, name, name.length(), value, value.length());
+
+        addHeader(req_info_ptr, name.getBytes(ISO_8859_1),
+            value.getBytes(ISO_8859_1));
     }
 
     private static String dateToString(long date)
@@ -183,10 +195,15 @@ public class Response implements HttpServletResponse {
     {
         trace("addHeader: " + name + ": " + value);
 
-        addHeader(req_info_ptr, name, name.length(), value, value.length());
+        if (value == null) {
+            return;
+        }
+
+        addHeader(req_info_ptr, name.getBytes(ISO_8859_1),
+            value.getBytes(ISO_8859_1));
     }
 
-    private static native void addHeader(long req_info_ptr, String name, int name_len, String value, int value_len);
+    private static native void addHeader(long req_info_ptr, byte[] name, byte[] value);
 
 
     @Override
@@ -194,10 +211,10 @@ public class Response implements HttpServletResponse {
     {
         trace("addIntHeader: " + name + ": " + value);
 
-        addIntHeader(req_info_ptr, name, name.length(), value);
+        addIntHeader(req_info_ptr, name.getBytes(ISO_8859_1), value);
     }
 
-    private static native void addIntHeader(long req_info_ptr, String name, int name_len, int value);
+    private static native void addIntHeader(long req_info_ptr, byte[] name, int value);
 
 
     @Override
@@ -205,10 +222,10 @@ public class Response implements HttpServletResponse {
     {
         trace("containsHeader: " + name);
 
-        return containsHeader(req_info_ptr, name, name.length());
+        return containsHeader(req_info_ptr, name.getBytes(ISO_8859_1));
     }
 
-    private static native boolean containsHeader(long req_info_ptr, String name, int name_len);
+    private static native boolean containsHeader(long req_info_ptr, byte[] name);
 
 
     @Override
@@ -246,10 +263,10 @@ public class Response implements HttpServletResponse {
     {
         trace("getHeader: " + name);
 
-        return getHeader(req_info_ptr, name, name.length());
+        return getHeader(req_info_ptr, name.getBytes(ISO_8859_1));
     }
 
-    private static native String getHeader(long req_info_ptr, String name, int name_len);
+    private static native String getHeader(long req_info_ptr, byte[] name);
 
 
     @Override
@@ -273,7 +290,7 @@ public class Response implements HttpServletResponse {
     {
         trace("getHeaders: " + name);
 
-        Enumeration<String> e = getHeaders(req_info_ptr, name, name.length());
+        Enumeration<String> e = getHeaders(req_info_ptr, name.getBytes(ISO_8859_1));
         if (e == null) {
             return Collections.emptyList();
         }
@@ -281,7 +298,7 @@ public class Response implements HttpServletResponse {
         return Collections.list(e);
     }
 
-    private static native Enumeration<String> getHeaders(long req_info_ptr, String name, int name_len);
+    private static native Enumeration<String> getHeaders(long req_info_ptr, byte[] name);
 
 
     @Override
@@ -356,10 +373,12 @@ public class Response implements HttpServletResponse {
     {
         trace("sendRedirect: " + location);
 
-        sendRedirect(req_info_ptr, location, location.length());
+        /* TODO resolve relative URL to absolute */
+
+        sendRedirect(req_info_ptr, location.getBytes(ISO_8859_1));
     }
 
-    private static native void sendRedirect(long req_info_ptr, String location, int location_len);
+    private static native void sendRedirect(long req_info_ptr, byte[] location);
 
 
     @Override
@@ -368,7 +387,9 @@ public class Response implements HttpServletResponse {
         trace("setDateHeader: " + name + ": " + date);
 
         String value = dateToString(date);
-        setHeader(req_info_ptr, name, name.length(), value, value.length());
+
+        setHeader(req_info_ptr, name.getBytes(ISO_8859_1),
+            value.getBytes(ISO_8859_1));
     }
 
 
@@ -377,21 +398,38 @@ public class Response implements HttpServletResponse {
     {
         trace("setHeader: " + name + ": " + value);
 
-        setHeader(req_info_ptr, name, name.length(), value, value.length());
+        if (CONTENT_TYPE.equalsIgnoreCase(name)) {
+            setContentType(value);
+            return;
+        }
+
+        /*
+         * When value is null container behaviour is undefined.
+         * - Tomcat ignores setHeader call;
+         * - Jetty & Resin acts as removeHeader;
+         */
+        if (value == null) {
+            removeHeader(req_info_ptr, name.getBytes(ISO_8859_1));
+            return;
+        }
+
+        setHeader(req_info_ptr, name.getBytes(ISO_8859_1),
+            value.getBytes(ISO_8859_1));
     }
 
-    private static native void setHeader(long req_info_ptr, String name, int name_len, String value, int value_len);
+    private static native void setHeader(long req_info_ptr, byte[] name, byte[] value);
 
+    private static native void removeHeader(long req_info_ptr, byte[] name);
 
     @Override
     public void setIntHeader(String name, int value)
     {
         trace("setIntHeader: " + name + ": " + value);
 
-        setIntHeader(req_info_ptr, name, name.length(), value);
+        setIntHeader(req_info_ptr, name.getBytes(ISO_8859_1), value);
     }
 
-    private static native void setIntHeader(long req_info_ptr, String name, int name_len, int value);
+    private static native void setIntHeader(long req_info_ptr, byte[] name, int value);
 
 
     @Override
@@ -550,7 +588,31 @@ public class Response implements HttpServletResponse {
     {
         log("setCharacterEncoding " + charset);
 
-        characterEncoding = charset;
+        if (charset == null) {
+            if (writer != null
+                && !characterEncoding.equalsIgnoreCase(defaultCharacterEncoding))
+            {
+                /* TODO throw */
+                return;
+            }
+
+            characterEncoding = defaultCharacterEncoding;
+        } else {
+            if (writer != null
+                && !characterEncoding.equalsIgnoreCase(charset))
+            {
+                /* TODO throw */
+                return;
+            }
+
+            characterEncoding = charset;
+        }
+
+        if (contentType != null) {
+            String type = contentType + ";charset=" + characterEncoding;
+
+            setContentType(req_info_ptr, type.getBytes(ISO_8859_1));
+        }
     }
 
 
@@ -578,11 +640,48 @@ public class Response implements HttpServletResponse {
     {
         log("setContentType: " + type);
 
-        // TODO sync charset with characterEncoding
-        setContentType(req_info_ptr, type, type.length());
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
+
+        if (type == null) {
+            removeContentType(req_info_ptr);
+            contentType = null;
+            return;
+        }
+
+        String charset = MimeTypes.getCharsetFromContentType(type);
+        String ctype = MimeTypes.getContentTypeWithoutCharset(type);
+
+        if (writer != null
+            && charset != null
+            && !characterEncoding.equalsIgnoreCase(charset))
+        {
+            /* To late to change character encoding */
+            charset = characterEncoding;
+            type = ctype + ";charset=" + characterEncoding;
+        }
+
+        if (charset == null) {
+            type = type + ";charset=" + characterEncoding;
+        } else {
+            characterEncoding = charset;
+        }
+
+        contentType = ctype;
+
+        setContentType(req_info_ptr, type.getBytes(ISO_8859_1));
     }
 
-    private static native void setContentType(long req_info_ptr, String type, int type_len);
+    private static native void setContentType(long req_info_ptr, byte[] type);
+
+    private static native void removeContentType(long req_info_ptr);
+
+    public boolean isIncluding()
+    {
+        return getRequest(req_info_ptr).getDispatcherType()
+            == DispatcherType.INCLUDE;
+    }
 
 
     @Override
@@ -594,17 +693,17 @@ public class Response implements HttpServletResponse {
     private void log(String msg)
     {
         msg = "Response." + msg;
-        log(req_info_ptr, msg, msg.length());
+        log(req_info_ptr, msg.getBytes(UTF_8));
     }
 
-    public static native void log(long req_info_ptr, String msg, int msg_len);
+    public static native void log(long req_info_ptr, byte[] msg);
 
 
     private void trace(String msg)
     {
         msg = "Response." + msg;
-        trace(req_info_ptr, msg, msg.length());
+        trace(req_info_ptr, msg.getBytes(UTF_8));
     }
 
-    public static native void trace(long req_info_ptr, String msg, int msg_len);
+    public static native void trace(long req_info_ptr, byte[] msg);
 }
