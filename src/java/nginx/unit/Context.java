@@ -165,6 +165,7 @@ public class Context implements ServletContext, InitParams
         HttpSessionListener.class
     };
 
+    private final List<String> pending_listener_classnames_ = new ArrayList<>();
     private final Set<String> listener_classnames_ = new HashSet<>();
 
     private final List<ServletContextListener> ctx_listeners_ = new ArrayList<>();
@@ -340,6 +341,8 @@ public class Context implements ServletContext, InitParams
             trace("archives: " + urls[i]);
         }
 
+        processWebXml(root);
+
         loader_ = new CtxClassLoader(urls,
             Context.class.getClassLoader().getParent());
 
@@ -347,7 +350,9 @@ public class Context implements ServletContext, InitParams
         Thread.currentThread().setContextClassLoader(loader_);
 
         try {
-            processWebXml(root);
+            for (String listener_classname : pending_listener_classnames_) {
+                addListener(listener_classname);
+            }
 
             ScanResult scan_res = null;
 
@@ -1036,7 +1041,7 @@ public class Context implements ServletContext, InitParams
             String class_name = classes.item(0).getTextContent().trim();
             trace("listener-class=" + class_name);
 
-            addListener(class_name);
+            pending_listener_classnames_.add(class_name);
         }
 
         NodeList error_pages = doc_elem.getElementsByTagName("error-page");
