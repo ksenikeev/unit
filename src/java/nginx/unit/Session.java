@@ -33,6 +33,7 @@ public class Session implements HttpSession, Serializable
         this.id = id;
         this.context = context;
         attr_listener = al;
+        last_access_time = new Date().getTime();
     }
 
     public void setId(String id)
@@ -56,6 +57,10 @@ public class Session implements HttpSession, Serializable
     public long getLastAccessedTime()
     {
         return last_access_time;
+    }
+
+    public void setLastAccessedTime(long last_access_time) {
+        this.last_access_time = last_access_time;
     }
 
     @Override

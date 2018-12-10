@@ -32,20 +32,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Enumeration;
-import java.util.EventListener;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.ServiceLoader;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
@@ -88,14 +75,7 @@ import javax.servlet.annotation.WebListener;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import javax.servlet.descriptor.JspPropertyGroupDescriptor;
 import javax.servlet.descriptor.TaglibDescriptor;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSessionAttributeListener;
-import javax.servlet.http.HttpSessionBindingEvent;
-import javax.servlet.http.HttpSessionEvent;
-import javax.servlet.http.HttpSessionIdListener;
-import javax.servlet.http.HttpSessionListener;
+import javax.servlet.http.*;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -1640,9 +1620,54 @@ public class Context implements ServletContext, InitParams
             throws ServletException, IOException
         {
             init();
-
+            checkTimeOut(request);
             servlet_.service(request, response);
         }
+
+        //SESSION
+        private void checkTimeOut(ServletRequest request) {
+            if (request instanceof HttpServletRequest) {
+                Cookie cookie = getSessionIdCookie((HttpServletRequest) request);
+                HttpSession currentSession = null;
+                currentSession = sessions_.get(cookie.getValue());
+
+                if (currentSession != null) {
+
+                    long now = new Date().getTime();
+                    //если у найденной сессии истекло время ожидания
+                    long timeoutDateTime = currentSession.getLastAccessedTime() + session_timeout_*1000*60;
+                    if (timeoutDateTime < now) {
+                        //забываем про нее на сервере
+                        trace("timeout'ed session removed: " + currentSession.getId() + " now=" + now + ", timeout_time="+timeoutDateTime);
+                        sessions_.remove(currentSession.getId());
+                        //возвращаем null
+                        currentSession = null;
+                    } else {
+                        //иначе обновляем время последнего обращения
+                        ((Session) currentSession).setLastAccessedTime(now);
+                    }
+                }
+            }
+        }
+        //SESSION
+        private Cookie getSessionIdCookie(HttpServletRequest request)
+        {
+            Cookie cookie = null;
+            Cookie[] cookies = request.getCookies();
+            if(cookies!=null)
+            {
+                trace("cookies found! count = "+cookies.length);
+                for (Cookie next : cookies) {
+                    if (next.getName().equals(session_cookie_config_.getName())) {
+                        cookie = next;
+                        trace("sessionId cookie found: "+ cookie);
+                        break;
+                    }
+                }
+            }
+            return cookie;
+        }
+
 
         public void addFilter(FilterMap fmap)
         {
