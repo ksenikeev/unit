@@ -407,6 +407,18 @@ public class Context implements ServletContext, InitParams
                 parseURLPattern("*.jspx", jsp_servlet);
             }
 
+            for (PrefixPattern p : prefix_patterns_) {
+                /*
+                    Optimization: add prefix patterns to exact2servlet_ map.
+                    This should not affect matching result because full path
+                    is the longest matched prefix.
+                 */
+                if (!exact2servlet_.containsKey(p.pattern)) {
+                    trace("adding prefix pattern " + p.pattern + " to exact patterns map");
+                    exact2servlet_.put(p.pattern, p.servlet);
+                }
+            }
+
             Collections.sort(prefix_patterns_);
         } finally {
             Thread.currentThread().setContextClassLoader(old);
@@ -535,7 +547,7 @@ public class Context implements ServletContext, InitParams
          */
         ServletReg servlet = exact2servlet_.get(path);
         if (servlet != null) {
-            trace("findServlet: '" + path + "' matched exact pattern");
+            trace("findServlet: '" + path + "' exact matched pattern");
             if (req != null) {
                 req.setServletPath(path, null);
             }
@@ -553,6 +565,7 @@ public class Context implements ServletContext, InitParams
                 trace("findServlet: '" + path + "' matched prefix pattern '" + p.pattern + "'");
                 if (req != null) {
                     if (p.pattern.length() == path.length()) {
+                        log("findServlet: WARNING: it is expected '" + path + "' exactly matches " + p.pattern);
                         req.setServletPath(p.pattern, null);
                     } else {
                         req.setServletPath(p.pattern,
@@ -1809,6 +1822,7 @@ public class Context implements ServletContext, InitParams
         URLPattern pattern = parsed_patterns_.get(p);
         if (pattern == null) {
             pattern = new URLPattern(p);
+            parsed_patterns_.put(p, pattern);
         }
 
         return pattern;
