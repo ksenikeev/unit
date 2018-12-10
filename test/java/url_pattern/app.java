@@ -12,11 +12,6 @@ public class app extends HttpServlet
 {
     private String id;
 
-    public app()
-    {
-        System.out.println("app(): #" + this);
-    }
-
     @Override
     public void init(ServletConfig sc)
         throws ServletException

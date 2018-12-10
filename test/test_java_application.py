@@ -310,6 +310,47 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual(headers['X-Content-Type'], 'text/html;charset=utf-8', '#8 response Content-Type')
         self.assertEqual(headers['X-Character-Encoding'], 'utf-8', '#8 response charset')
 
+    def test_java_application_welcome_files(self):
+        self.load('welcome_files')
+
+        headers = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/')['headers']
+
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/dir1')
+
+        self.assertEqual(resp['status'], 302, 'dir redirect expected')
+
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/dir1/')
+
+        self.assertEqual('This is index.txt.' in resp['body'], True, 'dir1 index body')
+
+
+        headers = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/dir2/')['headers']
+
+        self.assertEqual(headers['X-Unit-JSP'], 'ok', 'JSP Ok header')
+
+
+        headers = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/dir3/')['headers']
+
+        self.assertEqual(headers['X-App-Servlet'], '1', 'URL pattern overrides welcome file')
+
+
 
 if __name__ == '__main__':
     unittest.main()

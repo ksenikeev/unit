@@ -165,6 +165,7 @@ public class Context implements ServletContext, InitParams
         HttpSessionListener.class
     };
 
+    private final List<String> pending_listener_classnames_ = new ArrayList<>();
     private final Set<String> listener_classnames_ = new HashSet<>();
 
     private final List<ServletContextListener> ctx_listeners_ = new ArrayList<>();
@@ -248,7 +249,7 @@ public class Context implements ServletContext, InitParams
                 String url = request.getRequestURL().toString();
                 if (!url.endsWith("/")) {
                     response.setHeader("Location", url + "/");
-                    response.sendError(response.SC_SEE_OTHER);
+                    response.sendError(response.SC_FOUND);
                     return;
                 }
 
@@ -340,6 +341,8 @@ public class Context implements ServletContext, InitParams
             trace("archives: " + urls[i]);
         }
 
+        processWebXml(root);
+
         loader_ = new CtxClassLoader(urls,
             Context.class.getClassLoader().getParent());
 
@@ -347,7 +350,9 @@ public class Context implements ServletContext, InitParams
         Thread.currentThread().setContextClassLoader(loader_);
 
         try {
-            processWebXml(root);
+            for (String listener_classname : pending_listener_classnames_) {
+                addListener(listener_classname);
+            }
 
             ScanResult scan_res = null;
 
@@ -400,6 +405,22 @@ public class Context implements ServletContext, InitParams
 
                 parseURLPattern("*.jsp", jsp_servlet);
                 parseURLPattern("*.jspx", jsp_servlet);
+            }
+
+            if (!name2servlet_.containsKey("default")) {
+                name2servlet_.put("default", system_default_servlet_);
+            }
+
+            for (PrefixPattern p : prefix_patterns_) {
+                /*
+                    Optimization: add prefix patterns to exact2servlet_ map.
+                    This should not affect matching result because full path
+                    is the longest matched prefix.
+                 */
+                if (!exact2servlet_.containsKey(p.pattern)) {
+                    trace("adding prefix pattern " + p.pattern + " to exact patterns map");
+                    exact2servlet_.put(p.pattern, p.servlet);
+                }
             }
 
             Collections.sort(prefix_patterns_);
@@ -465,8 +486,9 @@ public class Context implements ServletContext, InitParams
             } else {
                 p = ep.getParent();
             }
+
             if (!p.toFile().isDirectory()) {
-                Files.createDirectories(ep.getParent());
+                Files.createDirectories(p);
             }
 
             if (!e.isDirectory()) {
@@ -530,7 +552,7 @@ public class Context implements ServletContext, InitParams
          */
         ServletReg servlet = exact2servlet_.get(path);
         if (servlet != null) {
-            trace("findServlet: '" + path + "' matched exact pattern");
+            trace("findServlet: '" + path + "' exact matched pattern");
             if (req != null) {
                 req.setServletPath(path, null);
             }
@@ -548,6 +570,7 @@ public class Context implements ServletContext, InitParams
                 trace("findServlet: '" + path + "' matched prefix pattern '" + p.pattern + "'");
                 if (req != null) {
                     if (p.pattern.length() == path.length()) {
+                        log("findServlet: WARNING: it is expected '" + path + "' exactly matches " + p.pattern);
                         req.setServletPath(p.pattern, null);
                     } else {
                         req.setServletPath(p.pattern,
@@ -593,31 +616,94 @@ public class Context implements ServletContext, InitParams
 
         trace("findServlet: '" + path + "' no servlet found");
 
+        /*
+            10.10 Welcome Files
+            ...
+            If a Web container receives a valid partial request, the Web
+            container must examine the welcome file list defined in the
+            deployment descriptor.
+            ...
+         */
+        if (path.endsWith("/")) {
+            for (String wf : welcome_files_) {
+                String wpath = path + wf;
+
+                /*
+                    The Web server must append each welcome file in the order
+                    specified in the deployment descriptor to the partial
+                    request and check whether a static resource in the WAR is
+                    mapped to that request URI. If no match is found, ...
+                 */
+
+                /*
+                    Looking for and serving static content is inconsistent
+                    with url pattern matching functionality. Tomcat, Jetty and
+                    Resin not served static files when url pattern matched.
+                 */
+
+                /*
+                    ... the Web server MUST again append each welcome file
+                    in the order specified in the deployment descriptor to
+                    the partial request and check if a servlet is mapped
+                    to that request URI. The Web container must send the
+                    request to the first resource in the WAR that matches.
+                 */
+
+                servlet = exact2servlet_.get(wpath);
+                if (servlet != null) {
+                    trace("findServlet: '" + wpath + "' exact matched pattern");
+                    if (req != null) {
+                        req.setServletPath(wpath, null);
+                    }
+                    return servlet;
+                }
+
+                suffix_start = wpath.lastIndexOf('.');
+                if (suffix_start != -1) {
+                    String suffix = wpath.substring(suffix_start);
+                    servlet = suffix2servlet_.get(suffix);
+                    if (servlet != null) {
+                        trace("findServlet: '" + wpath + "' matched suffix pattern");
+
+                        /*
+                            If we want to show the directory content when
+                            index.jsp is absent, then we have to check file
+                            presence here. Otherwise user will get 404.
+                         */
+
+                        if (servlet instanceof JspServletReg) {
+                            File f = new File(webapp_, wpath.substring(1));
+                            if (!f.exists()) {
+                                trace("findServlet: '" + wpath + "' not exists");
+                                continue;
+                            }
+                        }
+
+                        if (req != null) {
+                            req.setServletPath(wpath, null);
+                        }
+                        return servlet;
+                    }
+                }
+
+                File f = new File(webapp_, wpath.substring(1));
+                if (f.exists()) {
+                    trace("findServlet: '" + path + "' found static welcome "
+                          + "file '" + wf + "' system default servlet");
+
+                    if (req != null) {
+                        req.setServletPath(wpath, null);
+                    }
+
+                    return system_default_servlet_;
+                }
+            }
+        }
+
         File dir = new File(webapp_, path.substring(1));
         if (!dir.exists()) {
+            trace("findServlet: file " + dir + " is not exists");
             return null;
-        }
-
-        if (!dir.isDirectory() || !path.endsWith("/")) {
-            trace("findServlet: '" + path + "' matched system default servlet");
-            if (req != null) {
-                req.setServletPath(path, null);
-            }
-            return system_default_servlet_;
-        }
-
-        for (String wf : welcome_files_) {
-            File f = new File(dir, wf);
-            if (!f.exists()) {
-                continue;
-            }
-
-            trace("findServlet: '" + path + "' found welcome file '" + wf
-                  + "' system default servlet");
-            if (req != null) {
-                req.setServletPath(path + wf, null);
-            }
-            return system_default_servlet_;
         }
 
         trace("findServlet: '" + path + "' fallback to system default servlet");
@@ -856,7 +942,21 @@ public class Context implements ServletContext, InitParams
             NodeList files = list_el.getElementsByTagName("welcome-file");
             for (int j = 0; j < files.getLength(); j++) {
                 Node node = files.item(j);
-                welcome_files_.add(node.getTextContent().trim());
+                String wf = node.getTextContent().trim();
+
+                /*
+                    10.10 Welcome Files
+                    ...
+                    The welcome file list is an ordered list of partial URLs
+                    with no trailing or leading /.
+                 */
+
+                if (wf.startsWith("/") || wf.endsWith("/")) {
+                    log("invalid welcome file: " + wf);
+                    continue;
+                }
+
+                welcome_files_.add(wf);
             }
         }
 
@@ -1036,7 +1136,7 @@ public class Context implements ServletContext, InitParams
             String class_name = classes.item(0).getTextContent().trim();
             trace("listener-class=" + class_name);
 
-            addListener(class_name);
+            pending_listener_classnames_.add(class_name);
         }
 
         NodeList error_pages = doc_elem.getElementsByTagName("error-page");
@@ -1804,6 +1904,7 @@ public class Context implements ServletContext, InitParams
         URLPattern pattern = parsed_patterns_.get(p);
         if (pattern == null) {
             pattern = new URLPattern(p);
+            parsed_patterns_.put(p, pattern);
         }
 
         return pattern;
@@ -2255,10 +2356,62 @@ public class Context implements ServletContext, InitParams
         }
     }
 
+    private class ServletDispatcher implements RequestDispatcher
+    {
+        private final ServletReg servlet_;
+
+        public ServletDispatcher(ServletReg servlet)
+        {
+            servlet_ = servlet;
+        }
+
+        @Override
+        public void forward(ServletRequest request, ServletResponse response)
+            throws ServletException, IOException
+        {
+            trace("ServletDispatcher.forward");
+            Request r = (Request) request;
+
+            DispatcherType dtype = r.getDispatcherType();
+
+            r.setDispatcherType(DispatcherType.FORWARD);
+
+            servlet_.service(r, response);
+
+            r.setDispatcherType(dtype);
+
+            trace("ServletDispatcher.forward done");
+        }
+
+        @Override
+        public void include(ServletRequest request, ServletResponse response)
+            throws ServletException, IOException
+        {
+            trace("ServletDispatcher.include");
+            Request r = (Request) request;
+
+            DispatcherType dtype = request.getDispatcherType();
+
+            r.setDispatcherType(DispatcherType.INCLUDE);
+
+            servlet_.service(r, response);
+
+            r.setDispatcherType(dtype);
+
+            trace("ServletDispatcher.include done");
+        }
+    }
+
     @Override
     public RequestDispatcher getNamedDispatcher(String name)
     {
-        log("getNamedDispatcher for " + name);
+        trace("getNamedDispatcher for " + name);
+
+        ServletReg servlet = name2servlet_.get(name);
+        if (servlet != null) {
+            return new ServletDispatcher(servlet);
+        }
+
         return null;
     }
 
