@@ -482,8 +482,9 @@ public class Context implements ServletContext, InitParams
             } else {
                 p = ep.getParent();
             }
+
             if (!p.toFile().isDirectory()) {
-                Files.createDirectories(ep.getParent());
+                Files.createDirectories(p);
             }
 
             if (!e.isDirectory()) {
