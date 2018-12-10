@@ -407,6 +407,10 @@ public class Context implements ServletContext, InitParams
                 parseURLPattern("*.jspx", jsp_servlet);
             }
 
+            if (!name2servlet_.containsKey("default")) {
+                name2servlet_.put("default", system_default_servlet_);
+            }
+
             for (PrefixPattern p : prefix_patterns_) {
                 /*
                     Optimization: add prefix patterns to exact2servlet_ map.
@@ -2352,10 +2356,62 @@ public class Context implements ServletContext, InitParams
         }
     }
 
+    private class ServletDispatcher implements RequestDispatcher
+    {
+        private final ServletReg servlet_;
+
+        public ServletDispatcher(ServletReg servlet)
+        {
+            servlet_ = servlet;
+        }
+
+        @Override
+        public void forward(ServletRequest request, ServletResponse response)
+            throws ServletException, IOException
+        {
+            trace("ServletDispatcher.forward");
+            Request r = (Request) request;
+
+            DispatcherType dtype = r.getDispatcherType();
+
+            r.setDispatcherType(DispatcherType.FORWARD);
+
+            servlet_.service(r, response);
+
+            r.setDispatcherType(dtype);
+
+            trace("ServletDispatcher.forward done");
+        }
+
+        @Override
+        public void include(ServletRequest request, ServletResponse response)
+            throws ServletException, IOException
+        {
+            trace("ServletDispatcher.include");
+            Request r = (Request) request;
+
+            DispatcherType dtype = request.getDispatcherType();
+
+            r.setDispatcherType(DispatcherType.INCLUDE);
+
+            servlet_.service(r, response);
+
+            r.setDispatcherType(dtype);
+
+            trace("ServletDispatcher.include done");
+        }
+    }
+
     @Override
     public RequestDispatcher getNamedDispatcher(String name)
     {
-        log("getNamedDispatcher for " + name);
+        trace("getNamedDispatcher for " + name);
+
+        ServletReg servlet = name2servlet_.get(name);
+        if (servlet != null) {
+            return new ServletDispatcher(servlet);
+        }
+
         return null;
     }
 
