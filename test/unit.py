@@ -612,6 +612,9 @@ class TestUnitApplicationJava(TestUnitApplicationProto):
                 src.append(script_path + f)
                 continue
 
+            if os.path.isdir(script_path + f):
+                continue
+
             if f == 'web.xml':
                 if not os.path.isdir(web_inf_path):
                     os.makedirs(web_inf_path)

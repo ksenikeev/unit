@@ -23,29 +23,28 @@ static jmethodID  nxt_java_Response_ctor;
 
 
 static void JNICALL nxt_java_Response_addHeader(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring name, jint name_len,
-    jstring value, jint value_len);
+    jlong req_info_ptr, jarray name, jarray value);
 
 static nxt_unit_request_info_t *nxt_java_get_response_info(
     jlong req_info_ptr, uint32_t extra_fields, uint32_t extra_data);
 
 static void JNICALL nxt_java_Response_addIntHeader(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring name, jint name_len, jint value);
+    jlong req_info_ptr, jarray name, jint value);
 
 static void nxt_java_add_int_header(nxt_unit_request_info_t *req,
     const char *name, uint8_t name_len, int value);
 
 static jboolean JNICALL nxt_java_Response_containsHeader(JNIEnv *env,
-    jclass cls, jlong req_info_ptr, jstring name, jint name_len);
+    jclass cls, jlong req_info_ptr, jarray name);
 
 static jstring JNICALL nxt_java_Response_getHeader(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring name, jint name_len);
+    jlong req_info_ptr, jarray name);
 
 static jobject JNICALL nxt_java_Response_getHeaderNames(JNIEnv *env,
     jclass cls, jlong req_info_ptr);
 
 static jobject JNICALL nxt_java_Response_getHeaders(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring name, jint name_len);
+    jlong req_info_ptr, jarray name);
 
 static jint JNICALL nxt_java_Response_getStatus(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
@@ -57,17 +56,22 @@ static void JNICALL nxt_java_Response_commit(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
 
 static void JNICALL nxt_java_Response_sendRedirect(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring loc, jint loc_len);
+    jlong req_info_ptr, jarray loc);
 
 static int nxt_java_response_set_header(jlong req_info_ptr,
     const char *name, jint name_len, const char *value, jint value_len);
 
 static void JNICALL nxt_java_Response_setHeader(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring name, jint name_len,
-    jstring value, jint value_len);
+    jlong req_info_ptr, jarray name, jarray value);
+
+static void JNICALL nxt_java_Response_removeHeader(JNIEnv *env, jclass cls,
+    jlong req_info_ptr, jarray name);
+
+static int nxt_java_response_remove_header(jlong req_info_ptr,
+    const char *name, jint name_len);
 
 static void JNICALL nxt_java_Response_setIntHeader(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring name, jint name_len, jint value);
+    jlong req_info_ptr, jarray name, jint value);
 
 static void JNICALL nxt_java_Response_setStatus(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jint sc);
@@ -94,13 +98,16 @@ static void JNICALL nxt_java_Response_setContentLength(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jlong len);
 
 static void JNICALL nxt_java_Response_setContentType(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring type, jint type_len);
+    jlong req_info_ptr, jarray type);
+
+static void JNICALL nxt_java_Response_removeContentType(JNIEnv *env, jclass cls,
+    jlong req_info_ptr);
 
 static void JNICALL nxt_java_Response_log(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring msg, jint msg_len);
+    jlong req_info_ptr, jarray msg);
 
 static void JNICALL nxt_java_Response_trace(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring msg, jint msg_len);
+    jlong req_info_ptr, jarray msg);
 
 int
 nxt_java_initResponse(JNIEnv *env, jobject cl)
@@ -125,19 +132,19 @@ nxt_java_initResponse(JNIEnv *env, jobject cl)
 
     JNINativeMethod resp_methods[] = {
         { (char *) "addHeader",
-          (char *) "(JLjava/lang/String;ILjava/lang/String;I)V",
+          (char *) "(J[B[B)V",
           nxt_java_Response_addHeader },
 
         { (char *) "addIntHeader",
-          (char *) "(JLjava/lang/String;II)V",
+          (char *) "(J[BI)V",
           nxt_java_Response_addIntHeader },
 
         { (char *) "containsHeader",
-          (char *) "(JLjava/lang/String;I)Z",
+          (char *) "(J[B)Z",
           nxt_java_Response_containsHeader },
 
         { (char *) "getHeader",
-          (char *) "(JLjava/lang/String;I)Ljava/lang/String;",
+          (char *) "(J[B)Ljava/lang/String;",
           nxt_java_Response_getHeader },
 
         { (char *) "getHeaderNames",
@@ -145,7 +152,7 @@ nxt_java_initResponse(JNIEnv *env, jobject cl)
           nxt_java_Response_getHeaderNames },
 
         { (char *) "getHeaders",
-          (char *) "(JLjava/lang/String;I)Ljava/util/Enumeration;",
+          (char *) "(J[B)Ljava/util/Enumeration;",
           nxt_java_Response_getHeaders },
 
         { (char *) "getStatus",
@@ -161,15 +168,19 @@ nxt_java_initResponse(JNIEnv *env, jobject cl)
           nxt_java_Response_commit },
 
         { (char *) "sendRedirect",
-          (char *) "(JLjava/lang/String;I)V",
+          (char *) "(J[B)V",
           nxt_java_Response_sendRedirect },
 
         { (char *) "setHeader",
-          (char *) "(JLjava/lang/String;ILjava/lang/String;I)V",
+          (char *) "(J[B[B)V",
           nxt_java_Response_setHeader },
 
+        { (char *) "removeHeader",
+          (char *) "(J[B)V",
+          nxt_java_Response_removeHeader },
+
         { (char *) "setIntHeader",
-          (char *) "(JLjava/lang/String;II)V",
+          (char *) "(J[BI)V",
           nxt_java_Response_setIntHeader },
 
         { (char *) "setStatus",
@@ -205,15 +216,19 @@ nxt_java_initResponse(JNIEnv *env, jobject cl)
           nxt_java_Response_setContentLength },
 
         { (char *) "setContentType",
-          (char *) "(JLjava/lang/String;I)V",
+          (char *) "(J[B)V",
           nxt_java_Response_setContentType },
 
+        { (char *) "removeContentType",
+          (char *) "(J)V",
+          nxt_java_Response_removeContentType },
+
         { (char *) "log",
-          (char *) "(JLjava/lang/String;I)V",
+          (char *) "(J[B)V",
           nxt_java_Response_log },
 
         { (char *) "trace",
-          (char *) "(JLjava/lang/String;I)V",
+          (char *) "(J[B)V",
           nxt_java_Response_trace },
 
     };
@@ -243,34 +258,43 @@ nxt_java_newResponse(JNIEnv *env, nxt_unit_request_info_t *req)
 
 static void JNICALL
 nxt_java_Response_addHeader(JNIEnv *env, jclass cls, jlong req_info_ptr,
-    jstring name, jint name_len, jstring value, jint value_len)
+    jarray name, jarray value)
 {
     int                      rc;
-    const char               *name_str, *value_str;
+    char                     *name_str, *value_str;
+    jsize                    name_len, value_len;
     nxt_unit_request_info_t  *req;
+
+    name_len = (*env)->GetArrayLength(env, name);
+    value_len = (*env)->GetArrayLength(env, value);
 
     req = nxt_java_get_response_info(req_info_ptr, 1, name_len + value_len);
     if (req == NULL) {
         return;
     }
 
-    name_str = (*env)->GetStringUTFChars(env, name, NULL);
+    name_str = (*env)->GetPrimitiveArrayCritical(env, name, NULL);
     if (name_str == NULL) {
+        nxt_unit_req_warn(req, "addHeader: failed to get name content");
         return;
     }
 
-    value_str = (*env)->GetStringUTFChars(env, value, NULL);
-    if (value_str != NULL) {
-        rc = nxt_unit_response_add_field(req, name_str, name_len,
-                                         value_str, value_len);
-        if (rc != NXT_UNIT_OK) {
-            // throw
-        }
+    value_str = (*env)->GetPrimitiveArrayCritical(env, value, NULL);
+    if (value_str == NULL) {
+        (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
+        nxt_unit_req_warn(req, "addHeader: failed to get value content");
 
-        (*env)->ReleaseStringUTFChars(env, value, value_str);
+        return;
     }
 
-    (*env)->ReleaseStringUTFChars(env, name, name_str);
+    rc = nxt_unit_response_add_field(req, name_str, name_len,
+                                     value_str, value_len);
+    if (rc != NXT_UNIT_OK) {
+        // throw
+    }
+
+    (*env)->ReleasePrimitiveArrayCritical(env, value, value_str, 0);
+    (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
 }
 
 
@@ -329,24 +353,28 @@ nxt_java_get_response_info(jlong req_info_ptr, uint32_t extra_fields,
 
 static void JNICALL
 nxt_java_Response_addIntHeader(JNIEnv *env, jclass cls, jlong req_info_ptr,
-    jstring name, jint name_len, jint value)
+    jarray name, jint value)
 {
-    const char               *name_str;
+    char                     *name_str;
+    jsize                    name_len;
     nxt_unit_request_info_t  *req;
+
+    name_len = (*env)->GetArrayLength(env, name);
 
     req = nxt_java_get_response_info(req_info_ptr, 1, name_len + 40);
     if (req == NULL) {
         return;
     }
 
-    name_str = (*env)->GetStringUTFChars(env, name, NULL);
+    name_str = (*env)->GetPrimitiveArrayCritical(env, name, NULL);
     if (name_str == NULL) {
+        nxt_unit_req_warn(req, "addIntHeader: failed to get name content");
         return;
     }
 
     nxt_java_add_int_header(req, name_str, name_len, value);
 
-    (*env)->ReleaseStringUTFChars(env, name, name_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
 }
 
 
@@ -383,10 +411,11 @@ nxt_java_add_int_header(nxt_unit_request_info_t *req, const char *name,
 
 static jboolean JNICALL
 nxt_java_Response_containsHeader(JNIEnv *env,
-    jclass cls, jlong req_info_ptr, jstring name, jint name_len)
+    jclass cls, jlong req_info_ptr, jarray name)
 {
     jboolean                 res;
-    const char               *name_str;
+    char                     *name_str;
+    jsize                    name_len;
     nxt_unit_response_t      *resp;
     nxt_unit_request_info_t  *req;
 
@@ -402,9 +431,11 @@ nxt_java_Response_containsHeader(JNIEnv *env,
         return 0;
     }
 
-    name_str = (*env)->GetStringUTFChars(env, name, NULL);
+    name_len = (*env)->GetArrayLength(env, name);
+
+    name_str = (*env)->GetPrimitiveArrayCritical(env, name, NULL);
     if (name_str == NULL) {
-        nxt_unit_req_debug(req, "containsHeader: failed to get name");
+        nxt_unit_req_warn(req, "containsHeader: failed to get name content");
         return 0;
     }
 
@@ -414,7 +445,7 @@ nxt_java_Response_containsHeader(JNIEnv *env,
                               resp->fields + resp->fields_count,
                               name_str, name_len) != NULL;
 
-    (*env)->ReleaseStringUTFChars(env, name, name_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
 
     return res;
 }
@@ -422,9 +453,10 @@ nxt_java_Response_containsHeader(JNIEnv *env,
 
 static jstring JNICALL
 nxt_java_Response_getHeader(JNIEnv *env, jclass cls, jlong req_info_ptr,
-    jstring name, jint name_len)
+    jarray name)
 {
-    const char               *name_str;
+    char                     *name_str;
+    jsize                    name_len;
     nxt_unit_field_t         *f;
     nxt_unit_request_info_t  *req;
 
@@ -440,9 +472,11 @@ nxt_java_Response_getHeader(JNIEnv *env, jclass cls, jlong req_info_ptr,
         return NULL;
     }
 
-    name_str = (*env)->GetStringUTFChars(env, name, NULL);
+    name_len = (*env)->GetArrayLength(env, name);
+
+    name_str = (*env)->GetPrimitiveArrayCritical(env, name, NULL);
     if (name_str == NULL) {
-        nxt_unit_req_debug(req, "getHeader: failed to get name");
+        nxt_unit_req_warn(req, "getHeader: failed to get name content");
         return NULL;
     }
 
@@ -450,7 +484,7 @@ nxt_java_Response_getHeader(JNIEnv *env, jclass cls, jlong req_info_ptr,
                             req->response->fields + req->response->fields_count,
                             name_str, name_len);
 
-    (*env)->ReleaseStringUTFChars(env, name, name_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
 
     if (f == NULL) {
         return NULL;
@@ -485,9 +519,10 @@ nxt_java_Response_getHeaderNames(JNIEnv *env, jclass cls, jlong req_info_ptr)
 
 static jobject JNICALL
 nxt_java_Response_getHeaders(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring name, jint name_len)
+    jlong req_info_ptr, jarray name)
 {
-    const char               *name_str;
+    char                     *name_str;
+    jsize                    name_len;
     nxt_unit_field_t         *f;
     nxt_unit_response_t      *resp;
     nxt_unit_request_info_t  *req;
@@ -506,16 +541,18 @@ nxt_java_Response_getHeaders(JNIEnv *env, jclass cls,
 
     resp = req->response;
 
-    name_str = (*env)->GetStringUTFChars(env, name, NULL);
+    name_len = (*env)->GetArrayLength(env, name);
+
+    name_str = (*env)->GetPrimitiveArrayCritical(env, name, NULL);
     if (name_str == NULL) {
-        nxt_unit_req_debug(req, "getHeaders: failed to get name");
+        nxt_unit_req_warn(req, "getHeaders: failed to get name content");
         return NULL;
     }
 
     f = nxt_java_findHeader(resp->fields, resp->fields + resp->fields_count,
                             name_str, name_len);
 
-    (*env)->ReleaseStringUTFChars(env, name, name_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
 
     if (f == NULL) {
         f = resp->fields + resp->fields_count;
@@ -568,10 +605,11 @@ nxt_java_Response_commit(JNIEnv *env, jclass cls, jlong req_info_ptr)
 
 static void JNICALL
 nxt_java_Response_sendRedirect(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring loc, jint loc_len)
+    jlong req_info_ptr, jarray loc)
 {
     int                      rc;
-    const char               *loc_str;
+    char                     *loc_str;
+    jsize                    loc_len;
     nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
 
     static const char        location[] = "Location";
@@ -583,21 +621,21 @@ nxt_java_Response_sendRedirect(JNIEnv *env, jclass cls,
         return;
     }
 
-    loc_str = (*env)->GetStringUTFChars(env, loc, NULL);
-    if (loc_str == NULL) {
+    loc_len = (*env)->GetArrayLength(env, loc);
+
+    req = nxt_java_get_response_info(req_info_ptr, 1,
+                                     location_len + loc_len + 2);
+    if (req == NULL) {
         return;
     }
 
-    req = nxt_java_get_response_info(req_info_ptr, 0, 0);
-    if (req != NULL) {
-        (*env)->ReleaseStringUTFChars(env, loc, loc_str);
-
+    loc_str = (*env)->GetPrimitiveArrayCritical(env, loc, NULL);
+    if (loc_str == NULL) {
+        nxt_unit_req_warn(req, "sendRedirect: failed to get loc content");
         return;
     }
 
     req->response->status = 302;
-
-    // TODO transform loc to absolute URL
 
     rc = nxt_java_response_set_header(req_info_ptr, location, location_len,
                                       loc_str, loc_len);
@@ -605,7 +643,7 @@ nxt_java_Response_sendRedirect(JNIEnv *env, jclass cls,
         // throw
     }
 
-    (*env)->ReleaseStringUTFChars(env, loc, loc_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, loc, loc_str, 0);
 
     nxt_unit_response_send(req);
 }
@@ -639,13 +677,14 @@ nxt_java_response_set_header(jlong req_info_ptr,
             break;
         }
 
-        if (add_field && f->value_length <= (uint32_t) value_len) {
+        if (add_field && f->value_length >= (uint32_t) value_len) {
             dst = nxt_unit_sptr_get(&f->value);
             memcpy(dst, value, value_len);
             dst[value_len] = '\0';
             f->value_length = value_len;
 
             add_field = 0;
+            f->skip = 0;
 
         } else {
             f->skip = 1;
@@ -669,20 +708,27 @@ nxt_java_response_set_header(jlong req_info_ptr,
 
 static void JNICALL
 nxt_java_Response_setHeader(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring name, jint name_len,
-    jstring value, jint value_len)
+    jlong req_info_ptr, jarray name, jarray value)
 {
-    int         rc;
-    const char  *name_str, *value_str;
+    int    rc;
+    char   *name_str, *value_str;
+    jsize  name_len, value_len;
 
-    name_str = (*env)->GetStringUTFChars(env, name, NULL);
+    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
+
+    name_len = (*env)->GetArrayLength(env, name);
+    value_len = (*env)->GetArrayLength(env, value);
+
+    name_str = (*env)->GetPrimitiveArrayCritical(env, name, NULL);
     if (name_str == NULL) {
+        nxt_unit_req_warn(req, "setHeader: failed to get name content");
         return;
     }
 
-    value_str = (*env)->GetStringUTFChars(env, value, NULL);
+    value_str = (*env)->GetPrimitiveArrayCritical(env, value, NULL);
     if (value_str == NULL) {
-        (*env)->ReleaseStringUTFChars(env, name, name_str);
+        (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
+        nxt_unit_req_warn(req, "setHeader: failed to get value content");
 
         return;
     }
@@ -693,23 +739,88 @@ nxt_java_Response_setHeader(JNIEnv *env, jclass cls,
         // throw
     }
 
-    (*env)->ReleaseStringUTFChars(env, value, value_str);
-    (*env)->ReleaseStringUTFChars(env, name, name_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, value, value_str, 0);
+    (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
+}
+
+
+static void JNICALL
+nxt_java_Response_removeHeader(JNIEnv *env, jclass cls,
+    jlong req_info_ptr, jarray name)
+{
+    int    rc;
+    char   *name_str;
+    jsize  name_len;
+
+    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
+
+    name_len = (*env)->GetArrayLength(env, name);
+
+    name_str = (*env)->GetPrimitiveArrayCritical(env, name, NULL);
+    if (name_str == NULL) {
+        nxt_unit_req_warn(req, "setHeader: failed to get name content");
+        return;
+    }
+
+    rc = nxt_java_response_remove_header(req_info_ptr, name_str, name_len);
+    if (rc != NXT_UNIT_OK) {
+        // throw
+    }
+
+    (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
+}
+
+
+static int
+nxt_java_response_remove_header(jlong req_info_ptr,
+    const char *name, jint name_len)
+{
+    nxt_unit_field_t         *f, *e;
+    nxt_unit_response_t      *resp;
+    nxt_unit_request_info_t  *req;
+
+    req = nxt_java_get_response_info(req_info_ptr, 0, 0);
+    if (req == NULL) {
+        return NXT_UNIT_ERROR;
+    }
+
+    resp = req->response;
+
+    f = resp->fields;
+    e = f + resp->fields_count;
+
+    for ( ;; ) {
+        f = nxt_java_findHeader(f, e, name, name_len);
+        if (f == NULL) {
+            break;
+        }
+
+        f->skip = 1;
+
+        ++f;
+    }
+
+    return NXT_UNIT_OK;
 }
 
 
 static void JNICALL
 nxt_java_Response_setIntHeader(JNIEnv *env, jclass cls,
-    jlong req_info_ptr, jstring name, jint name_len, jint value)
+    jlong req_info_ptr, jarray name, jint value)
 {
-    int         value_len, rc;
-    char        value_str[40];
-    const char  *name_str;
+    int    value_len, rc;
+    char   value_str[40];
+    char   *name_str;
+    jsize  name_len;
 
     value_len = snprintf(value_str, sizeof(value_str), "%d", (int) value);
 
-    name_str = (*env)->GetStringUTFChars(env, name, NULL);
+    name_len = (*env)->GetArrayLength(env, name);
+
+    name_str = (*env)->GetPrimitiveArrayCritical(env, name, NULL);
     if (name_str == NULL) {
+        nxt_unit_req_warn((nxt_unit_request_info_t *) req_info_ptr,
+                          "setIntHeader: failed to get name content");
         return;
     }
 
@@ -719,7 +830,7 @@ nxt_java_Response_setIntHeader(JNIEnv *env, jclass cls,
         // throw
     }
 
-    (*env)->ReleaseStringUTFChars(env, name, name_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
 }
 
 
@@ -883,15 +994,18 @@ nxt_java_Response_setContentLength(JNIEnv *env, jclass cls, jlong req_info_ptr,
 
 static void JNICALL
 nxt_java_Response_setContentType(JNIEnv *env, jclass cls, jlong req_info_ptr,
-    jstring type, jint type_len)
+    jarray type)
 {
-    int                    rc;
-    const char             *type_str;
+    int    rc;
+    char   *type_str;
+    jsize  type_len;
 
     static const char      content_type[] = "Content-Type";
     static const uint32_t  content_type_len = sizeof(content_type) - 1;
 
-    type_str = (*env)->GetStringUTFChars(env, type, NULL);
+    type_len = (*env)->GetArrayLength(env, type);
+
+    type_str = (*env)->GetPrimitiveArrayCritical(env, type, NULL);
     if (type_str == NULL) {
         return;
     }
@@ -903,42 +1017,57 @@ nxt_java_Response_setContentType(JNIEnv *env, jclass cls, jlong req_info_ptr,
         // throw
     }
 
-    (*env)->ReleaseStringUTFChars(env, type, type_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, type, type_str, 0);
 }
 
+
 static void JNICALL
-nxt_java_Response_log(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
-    jint msg_len)
+nxt_java_Response_removeContentType(JNIEnv *env, jclass cls, jlong req_info_ptr)
 {
-    const char               *msg_str;
+    nxt_java_response_remove_header(req_info_ptr, "Content-Type",
+                                    sizeof("Content-Type") - 1);
+}
+
+
+static void JNICALL
+nxt_java_Response_log(JNIEnv *env, jclass cls, jlong req_info_ptr, jarray msg)
+{
+    char                     *msg_str;
+    jsize                    msg_len;
     nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
 
-    msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
+    msg_len = (*env)->GetArrayLength(env, msg);
+
+    msg_str = (*env)->GetPrimitiveArrayCritical(env, msg, NULL);
     if (msg_str == NULL) {
+        nxt_unit_req_warn(req, "log: failed to get msg content");
         return;
     }
 
     nxt_unit_req_log(req, NXT_UNIT_LOG_INFO, "%.*s", msg_len, msg_str);
 
-    (*env)->ReleaseStringUTFChars(env, msg, msg_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, msg, msg_str, 0);
 }
 
 static void JNICALL
-nxt_java_Response_trace(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
-    jint msg_len)
+nxt_java_Response_trace(JNIEnv *env, jclass cls, jlong req_info_ptr, jarray msg)
 {
 #if (NXT_DEBUG)
-    const char               *msg_str;
+    char                     *msg_str;
+    jsize                    msg_len;
     nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
 
-    msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
+    msg_len = (*env)->GetArrayLength(env, msg);
+
+    msg_str = (*env)->GetPrimitiveArrayCritical(env, msg, NULL);
     if (msg_str == NULL) {
+        nxt_unit_req_warn(req, "trace: failed to get msg content");
         return;
     }
 
     nxt_unit_req_debug(req, "%.*s", msg_len, msg_str);
 
-    (*env)->ReleaseStringUTFChars(env, msg, msg_str);
+    (*env)->ReleasePrimitiveArrayCritical(env, msg, msg_str, 0);
 #endif
 }
 
