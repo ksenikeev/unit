@@ -249,7 +249,7 @@ public class Context implements ServletContext, InitParams
                 String url = request.getRequestURL().toString();
                 if (!url.endsWith("/")) {
                     response.setHeader("Location", url + "/");
-                    response.sendError(response.SC_SEE_OTHER);
+                    response.sendError(response.SC_FOUND);
                     return;
                 }
 
