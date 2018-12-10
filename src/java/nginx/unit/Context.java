@@ -612,31 +612,94 @@ public class Context implements ServletContext, InitParams
 
         trace("findServlet: '" + path + "' no servlet found");
 
+        /*
+            10.10 Welcome Files
+            ...
+            If a Web container receives a valid partial request, the Web
+            container must examine the welcome file list defined in the
+            deployment descriptor.
+            ...
+         */
+        if (path.endsWith("/")) {
+            for (String wf : welcome_files_) {
+                String wpath = path + wf;
+
+                /*
+                    The Web server must append each welcome file in the order
+                    specified in the deployment descriptor to the partial
+                    request and check whether a static resource in the WAR is
+                    mapped to that request URI. If no match is found, ...
+                 */
+
+                /*
+                    Looking for and serving static content is inconsistent
+                    with url pattern matching functionality. Tomcat, Jetty and
+                    Resin not served static files when url pattern matched.
+                 */
+
+                /*
+                    ... the Web server MUST again append each welcome file
+                    in the order specified in the deployment descriptor to
+                    the partial request and check if a servlet is mapped
+                    to that request URI. The Web container must send the
+                    request to the first resource in the WAR that matches.
+                 */
+
+                servlet = exact2servlet_.get(wpath);
+                if (servlet != null) {
+                    trace("findServlet: '" + wpath + "' exact matched pattern");
+                    if (req != null) {
+                        req.setServletPath(wpath, null);
+                    }
+                    return servlet;
+                }
+
+                suffix_start = wpath.lastIndexOf('.');
+                if (suffix_start != -1) {
+                    String suffix = wpath.substring(suffix_start);
+                    servlet = suffix2servlet_.get(suffix);
+                    if (servlet != null) {
+                        trace("findServlet: '" + wpath + "' matched suffix pattern");
+
+                        /*
+                            If we want to show the directory content when
+                            index.jsp is absent, then we have to check file
+                            presence here. Otherwise user will get 404.
+                         */
+
+                        if (servlet instanceof JspServletReg) {
+                            File f = new File(webapp_, wpath.substring(1));
+                            if (!f.exists()) {
+                                trace("findServlet: '" + wpath + "' not exists");
+                                continue;
+                            }
+                        }
+
+                        if (req != null) {
+                            req.setServletPath(wpath, null);
+                        }
+                        return servlet;
+                    }
+                }
+
+                File f = new File(webapp_, wpath.substring(1));
+                if (f.exists()) {
+                    trace("findServlet: '" + path + "' found static welcome "
+                          + "file '" + wf + "' system default servlet");
+
+                    if (req != null) {
+                        req.setServletPath(wpath, null);
+                    }
+
+                    return system_default_servlet_;
+                }
+            }
+        }
+
         File dir = new File(webapp_, path.substring(1));
         if (!dir.exists()) {
+            trace("findServlet: file " + dir + " is not exists");
             return null;
-        }
-
-        if (!dir.isDirectory() || !path.endsWith("/")) {
-            trace("findServlet: '" + path + "' matched system default servlet");
-            if (req != null) {
-                req.setServletPath(path, null);
-            }
-            return system_default_servlet_;
-        }
-
-        for (String wf : welcome_files_) {
-            File f = new File(dir, wf);
-            if (!f.exists()) {
-                continue;
-            }
-
-            trace("findServlet: '" + path + "' found welcome file '" + wf
-                  + "' system default servlet");
-            if (req != null) {
-                req.setServletPath(path + wf, null);
-            }
-            return system_default_servlet_;
         }
 
         trace("findServlet: '" + path + "' fallback to system default servlet");
@@ -875,7 +938,21 @@ public class Context implements ServletContext, InitParams
             NodeList files = list_el.getElementsByTagName("welcome-file");
             for (int j = 0; j < files.getLength(); j++) {
                 Node node = files.item(j);
-                welcome_files_.add(node.getTextContent().trim());
+                String wf = node.getTextContent().trim();
+
+                /*
+                    10.10 Welcome Files
+                    ...
+                    The welcome file list is an ordered list of partial URLs
+                    with no trailing or leading /.
+                 */
+
+                if (wf.startsWith("/") || wf.endsWith("/")) {
+                    log("invalid welcome file: " + wf);
+                    continue;
+                }
+
+                welcome_files_.add(wf);
             }
         }
 

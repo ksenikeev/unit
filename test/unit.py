@@ -613,6 +613,10 @@ class TestUnitApplicationJava(TestUnitApplicationProto):
                 continue
 
             if os.path.isdir(script_path + f):
+                if f == 'WEB-INF':
+                    continue
+
+                shutil.copytree(script_path + f, app_path + '/' + f)
                 continue
 
             if f == 'web.xml':
