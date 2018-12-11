@@ -23,7 +23,6 @@ public class Session implements HttpSession, Serializable
     private final long creation_time = new Date().getTime();
     private long last_access_time = 0;
     private long access_time = creation_time;
-    private int max_inactive_interval_=0; // in seconds
     private String id;
     private final Context context;
     private boolean is_new = true;
@@ -34,7 +33,6 @@ public class Session implements HttpSession, Serializable
         this.id = id;
         this.context = context;
         attr_listener = al;
-        max_inactive_interval_ = context.getSessionTimeout()*60;
     }
 
     public void setId(String id)
@@ -69,13 +67,13 @@ public class Session implements HttpSession, Serializable
     @Override
     public void setMaxInactiveInterval(int i)
     {
-        max_inactive_interval_ = i;
+
     }
 
     @Override
     public int getMaxInactiveInterval()
     {
-        return max_inactive_interval_;
+        return 0;
     }
 
     @Deprecated
@@ -240,9 +238,5 @@ public class Session implements HttpSession, Serializable
             last_access_time = access_time;
             access_time = new Date().getTime();
         }
-    }
-
-    public boolean checkTimeOut(){
-        return (access_time - last_access_time > max_inactive_interval_*1000);
     }
 }
