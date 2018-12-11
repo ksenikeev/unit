@@ -32,7 +32,20 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Enumeration;
+import java.util.EventListener;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
@@ -75,7 +88,14 @@ import javax.servlet.annotation.WebListener;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import javax.servlet.descriptor.JspPropertyGroupDescriptor;
 import javax.servlet.descriptor.TaglibDescriptor;
-import javax.servlet.http.*;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSessionAttributeListener;
+import javax.servlet.http.HttpSessionBindingEvent;
+import javax.servlet.http.HttpSessionEvent;
+import javax.servlet.http.HttpSessionIdListener;
+import javax.servlet.http.HttpSessionListener;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -128,7 +148,7 @@ public class Context implements ServletContext, InitParams
     private final Map<String, ServletReg> suffix2servlet_ = new HashMap<>();
     private ServletReg default_servlet_;
     private ServletReg system_default_servlet_ = new ServletReg("default",
-        new StaticServlet());
+            new StaticServlet());
 
     private final List<String> welcome_files_ = new ArrayList<>();
 
@@ -136,13 +156,13 @@ public class Context implements ServletContext, InitParams
     private final Map<Integer, String> error2location_ = new HashMap<>();
 
     public static final Class<?>[] LISTENER_TYPES = new Class[] {
-        ServletContextListener.class,
-        ServletContextAttributeListener.class,
-        ServletRequestListener.class,
-        ServletRequestAttributeListener.class,
-        HttpSessionAttributeListener.class,
-        HttpSessionIdListener.class,
-        HttpSessionListener.class
+            ServletContextListener.class,
+            ServletContextAttributeListener.class,
+            ServletRequestListener.class,
+            ServletRequestAttributeListener.class,
+            HttpSessionAttributeListener.class,
+            HttpSessionIdListener.class,
+            HttpSessionListener.class
     };
 
     private final List<String> pending_listener_classnames_ = new ArrayList<>();
@@ -186,8 +206,8 @@ public class Context implements ServletContext, InitParams
         public boolean match(String url)
         {
             return url.startsWith(pattern) && (
-                url.length() == pattern.length()
-                || url.charAt(pattern.length()) == '/');
+                    url.length() == pattern.length()
+                            || url.charAt(pattern.length()) == '/');
         }
 
         @Override
@@ -201,7 +221,7 @@ public class Context implements ServletContext, InitParams
     {
         @Override
         public void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws IOException, ServletException
+                throws IOException, ServletException
         {
             String path = request.getServletPath();
 
@@ -238,7 +258,7 @@ public class Context implements ServletContext, InitParams
                 PrintWriter writer = response.getWriter();
 
                 for (String n : ls) {
-                    writer.println("<a href=\"" + n + "\">" + n + "</a><br>"); 
+                    writer.println("<a href=\"" + n + "\">" + n + "</a><br>");
                 }
 
                 writer.close();
@@ -263,7 +283,7 @@ public class Context implements ServletContext, InitParams
     }
 
     public static Context start(String webapp, URL[] classpaths, URL[] jsps)
-        throws Exception
+            throws Exception
     {
         Context ctx = new Context();
 
@@ -279,12 +299,12 @@ public class Context implements ServletContext, InitParams
     }
 
     public void loadApp(String webapp, URL[] classpaths, URL[] jsps)
-        throws Exception
+            throws Exception
     {
         File root = new File(webapp);
         if (!root.exists()) {
             throw new FileNotFoundException(
-                "Unable to determine code source archive from " + root);
+                    "Unable to determine code source archive from " + root);
         }
 
         ArrayList<URL> url_list = new ArrayList<>();
@@ -324,7 +344,7 @@ public class Context implements ServletContext, InitParams
         processWebXml(root);
 
         loader_ = new CtxClassLoader(urls,
-            Context.class.getClassLoader().getParent());
+                Context.class.getClassLoader().getParent());
 
         ClassLoader old = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(loader_);
@@ -338,14 +358,14 @@ public class Context implements ServletContext, InitParams
 
             if (!metadata_complete_) {
                 scan_res = new ClassGraph()
-                    //.verbose()
-                    .overrideClassLoaders(loader_)
-                    //.ignoreParentClassLoaders()
-                    .enableClassInfo()
-                    .enableAnnotationInfo()
-                    .enableSystemPackages()
-                    //.enableAllInfo()
-                    .scan();
+                        //.verbose()
+                        .overrideClassLoaders(loader_)
+                        //.ignoreParentClassLoaders()
+                        .enableClassInfo()
+                        .enableAnnotationInfo()
+                        .enableSystemPackages()
+                        //.enableAllInfo()
+                        .scan();
 
                 loadInitializers(scan_res);
             }
@@ -418,7 +438,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         protected Class<?> loadClass(String name, boolean resolve)
-            throws ClassNotFoundException
+                throws ClassNotFoundException
         {
             // trace("Loader.loadClass: " + name + "; " + resolve);
 
@@ -434,7 +454,7 @@ public class Context implements ServletContext, InitParams
             }
 
             // Try the webapp classloader first
-            // Look in the webapp classloader as a resource, to avoid 
+            // Look in the webapp classloader as a resource, to avoid
             // loading a system class.
             String path = name.replace('.', '/').concat(".class");
             URL webapp_url = findResource(path);
@@ -473,7 +493,7 @@ public class Context implements ServletContext, InitParams
 
             if (!e.isDirectory()) {
                 Files.copy(jf.getInputStream(e), ep,
-                    StandardCopyOption.REPLACE_EXISTING);
+                        StandardCopyOption.REPLACE_EXISTING);
             }
 
             if (mod_time > 0) {
@@ -498,7 +518,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void doFilter (ServletRequest request, ServletResponse response)
-            throws IOException, ServletException
+                throws IOException, ServletException
         {
             if (filter_index_ < filters_.size()) {
                 filters_.get(filter_index_++).filter_.doFilter(request, response, this);
@@ -554,7 +574,7 @@ public class Context implements ServletContext, InitParams
                         req.setServletPath(p.pattern, null);
                     } else {
                         req.setServletPath(p.pattern,
-                            path.substring(p.pattern.length()));
+                                path.substring(p.pattern.length()));
                     }
                 }
                 return p.servlet;
@@ -669,7 +689,7 @@ public class Context implements ServletContext, InitParams
                 File f = new File(webapp_, wpath.substring(1));
                 if (f.exists()) {
                     trace("findServlet: '" + path + "' found static welcome "
-                          + "file '" + wf + "' system default servlet");
+                            + "file '" + wf + "' system default servlet");
 
                     if (req != null) {
                         req.setServletPath(wpath, null);
@@ -694,7 +714,7 @@ public class Context implements ServletContext, InitParams
     }
 
     public void service(Request req, Response resp)
-        throws ServletException, IOException
+            throws ServletException, IOException
     {
         ClassLoader old = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(loader_);
@@ -784,7 +804,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private void handleException(Throwable e, Request req, Response resp)
-        throws ServletException, IOException
+            throws ServletException, IOException
     {
         String location;
 
@@ -816,7 +836,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private void handleStatusCode(int code, Request req, Response resp)
-        throws ServletException, IOException
+            throws ServletException, IOException
     {
         String location;
 
@@ -832,7 +852,7 @@ public class Context implements ServletContext, InitParams
     }
 
     public void handleError(String location, Request req, Response resp)
-        throws ServletException, IOException
+            throws ServletException, IOException
     {
         try {
             log("handleError: " + location);
@@ -895,7 +915,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private void processWebXml(InputStream is)
-        throws ParserConfigurationException, SAXException, IOException
+            throws ParserConfigurationException, SAXException, IOException
     {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
@@ -971,7 +991,7 @@ public class Context implements ServletContext, InitParams
 
                 if (tag_name.equals("async-supported")) {
                     reg.setAsyncSupported(child_node.getTextContent().trim()
-                        .equals("true"));
+                            .equals("true"));
                     continue;
                 }
 
@@ -1058,7 +1078,7 @@ public class Context implements ServletContext, InitParams
 
                 if (tag_name.equals("async-supported")) {
                     reg.setAsyncSupported(child_node.getTextContent().trim()
-                        .equals("true"));
+                            .equals("true"));
                     continue;
                 }
 
@@ -1222,7 +1242,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private void processXmlInitParam(InitParams params, Element elem)
-          throws RuntimeException
+            throws RuntimeException
     {
         NodeList n = elem.getElementsByTagName("param-name");
         if (n == null || n.getLength() != 1) {
@@ -1234,7 +1254,7 @@ public class Context implements ServletContext, InitParams
             throw new RuntimeException("Invalid web.xml: 'param-value' tag not found");
         }
         params.setInitParameter(n.item(0).getTextContent().trim(),
-            v.item(0).getTextContent().trim());
+                v.item(0).getTextContent().trim());
     }
 
     private void loadInitializers(ScanResult scan_res)
@@ -1242,7 +1262,7 @@ public class Context implements ServletContext, InitParams
         trace("load initializer(s)");
 
         ServiceLoader<ServletContainerInitializer> initializers =
-            ServiceLoader.load(ServletContainerInitializer.class, loader_);
+                ServiceLoader.load(ServletContainerInitializer.class, loader_);
 
         for (ServletContainerInitializer sci : initializers) {
 
@@ -1266,13 +1286,13 @@ public class Context implements ServletContext, InitParams
                 trace("loadInitializers: find handles: " + c.getName());
 
                 ClassInfoList handles = c.isInterface()
-                    ? scan_res.getClassesImplementing(c.getName())
-                    : scan_res.getSubclasses(c.getName());
+                        ? scan_res.getClassesImplementing(c.getName())
+                        : scan_res.getSubclasses(c.getName());
 
                 for (ClassInfo ci : handles) {
                     if (ci.isInterface()
-                        || ci.isAnnotation()
-                        || ci.isAbstract())
+                            || ci.isAnnotation()
+                            || ci.isAbstract())
                     {
                         continue;
                     }
@@ -1297,15 +1317,15 @@ public class Context implements ServletContext, InitParams
     }
 
     private void scanClasses(ScanResult scan_res)
-        throws ReflectiveOperationException
+            throws ReflectiveOperationException
     {
         ClassInfoList filters = scan_res.getClassesWithAnnotation(WebFilter.class.getName());
 
         for (ClassInfo ci : filters) {
             if (ci.isInterface()
-                || ci.isAnnotation()
-                || ci.isAbstract()
-                || !ci.implementsInterface(Filter.class.getName()))
+                    || ci.isAnnotation()
+                    || ci.isAbstract()
+                    || !ci.implementsInterface(Filter.class.getName()))
             {
                 trace("scanClasses: ignoring Filter impl: " + ci.getName());
                 continue;
@@ -1369,9 +1389,9 @@ public class Context implements ServletContext, InitParams
 
         for (ClassInfo ci : servlets) {
             if (ci.isInterface()
-                || ci.isAnnotation()
-                || ci.isAbstract()
-                || !ci.extendsSuperclass(HttpServlet.class.getName()))
+                    || ci.isAnnotation()
+                    || ci.isAbstract()
+                    || !ci.extendsSuperclass(HttpServlet.class.getName()))
             {
                 trace("scanClasses: ignoring HttpServlet subclass: " + ci.getName());
                 continue;
@@ -1423,8 +1443,8 @@ public class Context implements ServletContext, InitParams
 
         for (ClassInfo ci : lstnrs) {
             if (ci.isInterface()
-                || ci.isAnnotation()
-                || ci.isAbstract())
+                    || ci.isAnnotation()
+                    || ci.isAbstract())
             {
                 trace("scanClasses: listener impl: " + ci.getName());
                 continue;
@@ -1499,28 +1519,28 @@ public class Context implements ServletContext, InitParams
     private void removeDir(File dir) throws IOException
     {
         Files.walkFileTree(dir.toPath(),
-            new SimpleFileVisitor<Path>() {
-                @Override
-                public FileVisitResult postVisitDirectory(
-                  Path dir, IOException exc) throws IOException {
-                    Files.delete(dir);
-                    return FileVisitResult.CONTINUE;
-                }
+                new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult postVisitDirectory(
+                            Path dir, IOException exc) throws IOException {
+                        Files.delete(dir);
+                        return FileVisitResult.CONTINUE;
+                    }
 
-                @Override
-                public FileVisitResult visitFile(
-                  Path file, BasicFileAttributes attrs) 
-                  throws IOException {
-                    Files.delete(file);
-                    return FileVisitResult.CONTINUE;
-                }
-            });
+                    @Override
+                    public FileVisitResult visitFile(
+                            Path file, BasicFileAttributes attrs)
+                            throws IOException {
+                        Files.delete(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
     }
 
     private class CtxInitParams implements InitParams
     {
         private final Map<String, String> init_params_ =
-            new HashMap<String, String>();
+                new HashMap<String, String>();
 
         public boolean setInitParameter(String name, String value)
         {
@@ -1581,7 +1601,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private class NamedReg extends CtxInitParams
-        implements Registration
+            implements Registration
     {
         private final String name_;
         private String class_name_;
@@ -1616,7 +1636,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private class ServletReg extends NamedReg
-        implements ServletRegistration.Dynamic, ServletConfig
+            implements ServletRegistration.Dynamic, ServletConfig
     {
         private Class<?> servlet_class_;
         private Servlet servlet_;
@@ -1693,8 +1713,8 @@ public class Context implements ServletContext, InitParams
         public void setClassName(String class_name) throws IllegalStateException
         {
             if (servlet_ != null
-                || servlet_class_ != null
-                || getClassName() != null)
+                    || servlet_class_ != null
+                    || getClassName() != null)
             {
                 throw new IllegalStateException("Class already initialized");
             }
@@ -1703,11 +1723,11 @@ public class Context implements ServletContext, InitParams
         }
 
         public void setClass(Class<?> servlet_class)
-            throws IllegalStateException
+                throws IllegalStateException
         {
             if (servlet_ != null
-                || servlet_class_ != null
-                || getClassName() != null)
+                    || servlet_class_ != null
+                    || getClassName() != null)
             {
                 throw new IllegalStateException("Class already initialized");
             }
@@ -1717,57 +1737,12 @@ public class Context implements ServletContext, InitParams
         }
 
         public void service(ServletRequest request, ServletResponse response)
-            throws ServletException, IOException
+                throws ServletException, IOException
         {
             init();
-            checkTimeOut(request);
+
             servlet_.service(request, response);
         }
-
-        //SESSION
-        private void checkTimeOut(ServletRequest request) {
-            if (request instanceof HttpServletRequest) {
-                Cookie cookie = getSessionIdCookie((HttpServletRequest) request);
-                HttpSession currentSession = null;
-                currentSession = sessions_.get(cookie.getValue());
-
-                if (currentSession != null) {
-
-                    long now = new Date().getTime();
-                    //если у найденной сессии истекло время ожидания
-                    long timeoutDateTime = currentSession.getLastAccessedTime() + session_timeout_*1000*60;
-                    if (timeoutDateTime < now) {
-                        //забываем про нее на сервере
-                        trace("timeout'ed session removed: " + currentSession.getId() + " now=" + now + ", timeout_time="+timeoutDateTime);
-                        sessions_.remove(currentSession.getId());
-                        //возвращаем null
-                        currentSession = null;
-                    } else {
-                        //иначе обновляем время последнего обращения
-                        ((Session) currentSession).setLastAccessedTime(now);
-                    }
-                }
-            }
-        }
-        //SESSION
-        private Cookie getSessionIdCookie(HttpServletRequest request)
-        {
-            Cookie cookie = null;
-            Cookie[] cookies = request.getCookies();
-            if(cookies!=null)
-            {
-                trace("cookies found! count = "+cookies.length);
-                for (Cookie next : cookies) {
-                    if (next.getName().equals(session_cookie_config_.getName())) {
-                        cookie = next;
-                        trace("sessionId cookie found: "+ cookie);
-                        break;
-                    }
-                }
-            }
-            return cookie;
-        }
-
 
         public void addFilter(FilterMap fmap)
         {
@@ -1836,7 +1811,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void setMultipartConfig(
-            MultipartConfigElement multipartConfig)
+                MultipartConfigElement multipartConfig)
         {
             log("ServletReg.setMultipartConfig");
         }
@@ -1877,7 +1852,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void service(ServletRequest request, ServletResponse response)
-            throws ServletException, IOException
+                throws ServletException, IOException
         {
             ClassLoader old = Thread.currentThread().getContextClassLoader();
             Thread.currentThread().setContextClassLoader(jsp_loader_);
@@ -1898,33 +1873,33 @@ public class Context implements ServletContext, InitParams
     }
 
     public void parseURLPattern(String p, ServletReg servlet)
-        throws IllegalArgumentException
+            throws IllegalArgumentException
     {
         URLPattern pattern = parseURLPattern(p);
 
         switch (pattern.type_) {
-        case PREFIX:
-            prefix_patterns_.add(new PrefixPattern(pattern.pattern_, servlet));
-            return;
+            case PREFIX:
+                prefix_patterns_.add(new PrefixPattern(pattern.pattern_, servlet));
+                return;
 
-        case SUFFIX:
-            suffix2servlet_.put(pattern.pattern_, servlet);
-            return;
+            case SUFFIX:
+                suffix2servlet_.put(pattern.pattern_, servlet);
+                return;
 
-        case EXACT:
-            exact2servlet_.put(pattern.pattern_, servlet);
-            return;
+            case EXACT:
+                exact2servlet_.put(pattern.pattern_, servlet);
+                return;
 
-        case DEFAULT:
-            default_servlet_ = servlet;
-            return;
+            case DEFAULT:
+                default_servlet_ = servlet;
+                return;
         }
 
         /* TODO process other cases, throw IllegalArgumentException */
     }
 
     public URLPattern parseURLPattern(String p)
-        throws IllegalArgumentException
+            throws IllegalArgumentException
     {
         URLPattern pattern = parsed_patterns_.get(p);
         if (pattern == null) {
@@ -1948,7 +1923,7 @@ public class Context implements ServletContext, InitParams
         private final URLPatternType type_;
 
         public URLPattern(String p)
-            throws IllegalArgumentException
+                throws IllegalArgumentException
         {
             /*
                 12.2 Specification of Mappings
@@ -2012,19 +1987,19 @@ public class Context implements ServletContext, InitParams
         public boolean match(String url)
         {
             switch (type_) {
-            case PREFIX:
-                return url.startsWith(pattern_) && (
-                    url.length() == pattern_.length()
-                    || url.charAt(pattern_.length()) == '/');
+                case PREFIX:
+                    return url.startsWith(pattern_) && (
+                            url.length() == pattern_.length()
+                                    || url.charAt(pattern_.length()) == '/');
 
-            case SUFFIX:
-                return url.endsWith(pattern_);
+                case SUFFIX:
+                    return url.endsWith(pattern_);
 
-            case EXACT:
-                return url.equals(pattern_);
+                case EXACT:
+                    return url.equals(pattern_);
 
-            case DEFAULT:
-                return true;
+                case DEFAULT:
+                    return true;
             }
 
             return false;
@@ -2032,7 +2007,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private class FilterReg extends NamedReg
-        implements FilterRegistration.Dynamic, FilterConfig
+            implements FilterRegistration.Dynamic, FilterConfig
     {
         private Class<?> filter_class_;
         private Filter filter_;
@@ -2064,8 +2039,8 @@ public class Context implements ServletContext, InitParams
         public void setClassName(String class_name) throws IllegalStateException
         {
             if (filter_ != null
-                || filter_class_ != null
-                || getClassName() != null)
+                    || filter_class_ != null
+                    || getClassName() != null)
             {
                 throw new IllegalStateException("Class already initialized");
             }
@@ -2076,8 +2051,8 @@ public class Context implements ServletContext, InitParams
         public void setClass(Class<?> filter_class) throws IllegalStateException
         {
             if (filter_ != null
-                || filter_class_ != null
-                || getClassName() != null)
+                    || filter_class_ != null
+                    || getClassName() != null)
             {
                 throw new IllegalStateException("Class already initialized");
             }
@@ -2116,8 +2091,8 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void addMappingForServletNames(
-            EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
-            String... servletNames)
+                EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
+                String... servletNames)
         {
             checkContextState();
 
@@ -2132,7 +2107,7 @@ public class Context implements ServletContext, InitParams
                 }
 
                 FilterMap map = new FilterMap(this, sreg, dispatcherTypes,
-                    isMatchAfter);
+                        isMatchAfter);
 
                 sreg.addFilter(map);
             }
@@ -2149,8 +2124,8 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void addMappingForUrlPatterns(
-            EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
-            String... urlPatterns)
+                EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
+                String... urlPatterns)
         {
             checkContextState();
 
@@ -2159,7 +2134,7 @@ public class Context implements ServletContext, InitParams
 
                 URLPattern p = parseURLPattern(u);
                 FilterMap map = new FilterMap(this, p, dispatcherTypes,
-                    isMatchAfter);
+                        isMatchAfter);
 
                 filter_maps_.add(map);
             }
@@ -2201,7 +2176,7 @@ public class Context implements ServletContext, InitParams
         private final boolean match_after_;
 
         public FilterMap(FilterReg filter, ServletReg servlet,
-            EnumSet<DispatcherType> dtypes, boolean match_after)
+                         EnumSet<DispatcherType> dtypes, boolean match_after)
         {
             filter_ = filter;
             servlet_ = servlet;
@@ -2211,7 +2186,7 @@ public class Context implements ServletContext, InitParams
         }
 
         public FilterMap(FilterReg filter, URLPattern pattern,
-            EnumSet<DispatcherType> dtypes, boolean match_after)
+                         EnumSet<DispatcherType> dtypes, boolean match_after)
         {
             filter_ = filter;
             servlet_ = null;
@@ -2310,7 +2285,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void forward(ServletRequest request, ServletResponse response)
-            throws ServletException, IOException
+                throws ServletException, IOException
         {
             try {
                 trace("CtxRequestDispatcher.forward");
@@ -2349,7 +2324,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void include(ServletRequest request, ServletResponse response)
-            throws ServletException, IOException
+                throws ServletException, IOException
         {
             try {
                 trace("CtxRequestDispatcher.include");
@@ -2392,7 +2367,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void forward(ServletRequest request, ServletResponse response)
-            throws ServletException, IOException
+                throws ServletException, IOException
         {
             trace("ServletDispatcher.forward");
             Request r = (Request) request;
@@ -2410,7 +2385,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void include(ServletRequest request, ServletResponse response)
-            throws ServletException, IOException
+                throws ServletException, IOException
         {
             trace("ServletDispatcher.include");
             Request r = (Request) request;
@@ -2649,7 +2624,7 @@ public class Context implements ServletContext, InitParams
         }
 
         ServletContextAttributeEvent scae = new ServletContextAttributeEvent(
-            this, name, prev == null ? object : prev);
+                this, name, prev == null ? object : prev);
 
         for (ServletContextAttributeListener l : ctx_attr_listeners_) {
             if (prev == null) {
@@ -2672,7 +2647,7 @@ public class Context implements ServletContext, InitParams
         }
 
         ServletContextAttributeEvent scae = new ServletContextAttributeEvent(
-            this, name, value);
+                this, name, value);
 
         for (ServletContextAttributeListener l : ctx_attr_listeners_) {
             l.attributeRemoved(scae);
@@ -2681,7 +2656,7 @@ public class Context implements ServletContext, InitParams
 
     @Override
     public FilterRegistration.Dynamic addFilter(String name,
-        Class<? extends Filter> filterClass)
+                                                Class<? extends Filter> filterClass)
     {
         log("addFilter<C> " + name + ", " + filterClass.getName());
 
@@ -2721,7 +2696,7 @@ public class Context implements ServletContext, InitParams
 
     @Override
     public ServletRegistration.Dynamic addServlet(String name,
-        Class<? extends Servlet> servletClass)
+                                                  Class<? extends Servlet> servletClass)
     {
         log("addServlet<C> " + name + ", " + servletClass.getName());
 
@@ -2851,10 +2826,20 @@ public class Context implements ServletContext, InitParams
 
             if (s != null) {
                 s.accessed();
+                s = checkTimeOut(s);
             }
 
             return s;
         }
+    }
+
+    private Session checkTimeOut(Session s) {
+        if (s.checkTimeOut())
+        {
+            s.invalidate();
+            return null;
+        }
+        return s;
     }
 
     public Session createSession()
@@ -3091,7 +3076,7 @@ public class Context implements ServletContext, InitParams
 
     @Override
     public <T extends EventListener> T createListener(Class<T> clazz)
-        throws ServletException
+            throws ServletException
     {
         log("createListener<C> " + clazz.getName());
 
@@ -3223,7 +3208,7 @@ public class Context implements ServletContext, InitParams
         }
 
         ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
-            this, r, name, value);
+                this, r, name, value);
 
         for (ServletRequestAttributeListener l : req_attr_listeners_) {
             l.attributeAdded(srae);
@@ -3237,7 +3222,7 @@ public class Context implements ServletContext, InitParams
         }
 
         ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
-            this, r, name, value);
+                this, r, name, value);
 
         for (ServletRequestAttributeListener l : req_attr_listeners_) {
             l.attributeReplaced(srae);
@@ -3251,7 +3236,7 @@ public class Context implements ServletContext, InitParams
         }
 
         ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
-            this, r, name, value);
+                this, r, name, value);
 
         for (ServletRequestAttributeListener l : req_attr_listeners_) {
             l.attributeRemoved(srae);
