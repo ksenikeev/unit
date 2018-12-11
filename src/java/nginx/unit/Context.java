@@ -2827,10 +2827,21 @@ public class Context implements ServletContext, InitParams
 
             if (s != null) {
                 s.accessed();
+                s = checkTimeOut(s);
             }
 
             return s;
         }
+    }
+
+    private Session checkTimeOut(Session s)
+    {
+        if (s.checkTimeOut()) {
+            s.invalidate();
+            return null;
+        }
+
+        return s;
     }
 
     public Session createSession()

@@ -25,7 +25,11 @@ public class app extends HttpServlet
             response.addHeader("X-Var-1", old_var1);
         }
 
+        if (s.isNew())
+            s.setMaxInactiveInterval(300);
+
         response.addHeader("X-Session-Id", s.getId());
         response.addHeader("X-Session-New", "" + s.isNew());
+        response.addHeader("X-Session-Interval", "" + s.getMaxInactiveInterval());
     }
 }
