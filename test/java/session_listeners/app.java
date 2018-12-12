@@ -2,12 +2,7 @@
 import java.io.IOException;
 
 import javax.servlet.ServletException;
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
-import javax.servlet.ServletRequestEvent;
-import javax.servlet.ServletRequestListener;
 import javax.servlet.annotation.WebServlet;
-import javax.servlet.annotation.WebListener;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -32,53 +27,39 @@ public class app extends HttpServlet implements
     private static String attribute_removed = "";
     private static String attribute_replaced = "";
 
-    public app()
-    {
-        System.out.println("" + this + ":app()");
-    }
-
     @Override
     public void sessionCreated(HttpSessionEvent se)
     {
-        System.out.println("" + this + ":sessionCreated: " + se.getSession().getId());
         session_created += se.getSession().getId();
     }
 
     @Override
     public void sessionDestroyed(HttpSessionEvent se)
     {
-        System.out.println("" + this + ":sessionDestroyed: " + se.getSession().getId());
         session_destroyed += se.getSession().getId();
     }
 
     @Override
     public void sessionIdChanged(HttpSessionEvent event, String oldId)
     {
-        System.out.println("" + this + ":sessionIdChanged: " + oldId + "->" + event.getSession().getId());
         session_id_changed += " " + oldId + "->" + event.getSession().getId();
     }
 
     @Override
     public void attributeAdded(HttpSessionBindingEvent event)
     {
-        System.out.println("" + this + ":attributeAdded: " + event.getSession().getId()
-            + ", " + event.getName() + "=" + event.getValue());
         attribute_added += event.getName() + "=" + event.getValue();
     }
 
     @Override
     public void attributeRemoved(HttpSessionBindingEvent event)
     {
-        System.out.println("" + this + ":attributeRemoved: " + event.getSession().getId()
-            + ", " + event.getName() + "=" + event.getValue());
         attribute_removed += event.getName() + "=" + event.getValue();
     }
 
     @Override
     public void attributeReplaced(HttpSessionBindingEvent event)
     {
-        System.out.println("" + this + ":attributeReplaced: " + event.getSession().getId()
-            + ", " + event.getName() + "=" + event.getValue());
         attribute_replaced += event.getName() + "=" + event.getValue();
     }
 
