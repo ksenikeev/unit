@@ -371,8 +371,10 @@ NXT_JAVA_CLASSES = \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/JspPropertyGroup.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/OutputStream.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Request.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/RequestAttrProxy.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Response.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Session.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/SessionAttrProxy.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/Taglib.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/UnitSessionCookieConfig.class \\
 

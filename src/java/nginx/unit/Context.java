@@ -175,13 +175,13 @@ public class Context implements ServletContext, InitParams
     private final List<ServletRequestListener> req_destroy_listeners_ = new ArrayList<>();
     private final List<ServletRequestAttributeListener> req_attr_listeners_ = new ArrayList<>();
 
-    private ServletRequestAttributeListener req_attr_listener_ = null;
+    private ServletRequestAttributeListener req_attr_proxy_ = null;
 
     private final List<HttpSessionAttributeListener> sess_attr_listeners_ = new ArrayList<>();
     private final List<HttpSessionIdListener> sess_id_listeners_ = new ArrayList<>();
     private final List<HttpSessionListener> sess_listeners_ = new ArrayList<>();
 
-    private SessionAttrListener attr_listener_ = null;
+    private HttpSessionAttributeListener sess_attr_proxy_ = null;
 
     private final SessionCookieConfig session_cookie_config_ = new UnitSessionCookieConfig();
     private final Set<SessionTrackingMode> default_session_tracking_modes_ = new HashSet<>();
@@ -2201,11 +2201,11 @@ public class Context implements ServletContext, InitParams
     private void initialized()
     {
         if (!sess_attr_listeners_.isEmpty()) {
-            attr_listener_ = new SessionAttrListener();
+            sess_attr_proxy_ = new SessionAttrProxy(sess_attr_listeners_);
         }
 
         if (!req_attr_listeners_.isEmpty()) {
-            req_attr_listener_ = new RequestAttrListener();
+            req_attr_proxy_ = new RequestAttrProxy(req_attr_listeners_);
         }
 
         ClassLoader old = Thread.currentThread().getContextClassLoader();
@@ -2840,7 +2840,7 @@ public class Context implements ServletContext, InitParams
 
     public Session createSession()
     {
-        Session session = new Session(this, generateSessionId(), attr_listener_);
+        Session session = new Session(this, generateSessionId(), sess_attr_proxy_);
 
         if (!sess_listeners_.isEmpty())
         {
@@ -2902,33 +2902,6 @@ public class Context implements ServletContext, InitParams
     private String generateSessionId()
     {
         return UUID.randomUUID().toString();
-    }
-
-    private class SessionAttrListener implements HttpSessionAttributeListener
-    {
-        @Override
-        public void attributeAdded(HttpSessionBindingEvent event)
-        {
-            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
-                l.attributeAdded(event);
-            }
-        }
-
-        @Override
-        public void attributeRemoved(HttpSessionBindingEvent event)
-        {
-            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
-                l.attributeRemoved(event);
-            }
-        }
-
-        @Override
-        public void attributeReplaced(HttpSessionBindingEvent event)
-        {
-            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
-                l.attributeReplaced(event);
-            }
-        }
     }
 
     @Override
@@ -3197,35 +3170,8 @@ public class Context implements ServletContext, InitParams
         log("setResponseCharacterEncoding: " + encoding);
     }
 
-    private class RequestAttrListener implements ServletRequestAttributeListener
-    {
-        @Override
-        public void attributeAdded(ServletRequestAttributeEvent srae)
-        {
-            for (ServletRequestAttributeListener l : req_attr_listeners_) {
-                l.attributeAdded(srae);
-            }
-        }
-
-        @Override
-        public void attributeReplaced(ServletRequestAttributeEvent srae)
-        {
-            for (ServletRequestAttributeListener l : req_attr_listeners_) {
-                l.attributeReplaced(srae);
-            }
-        }
-
-        @Override
-        public void attributeRemoved(ServletRequestAttributeEvent srae)
-        {
-            for (ServletRequestAttributeListener l : req_attr_listeners_) {
-                l.attributeRemoved(srae);
-            }
-        }
-    }
-
     public ServletRequestAttributeListener getRequestAttributeListener()
     {
-        return req_attr_listener_;
+        return req_attr_proxy_;
     }
 }
