@@ -175,6 +175,8 @@ public class Context implements ServletContext, InitParams
     private final List<ServletRequestListener> req_destroy_listeners_ = new ArrayList<>();
     private final List<ServletRequestAttributeListener> req_attr_listeners_ = new ArrayList<>();
 
+    private ServletRequestAttributeListener req_attr_listener_ = null;
+
     private final List<HttpSessionAttributeListener> sess_attr_listeners_ = new ArrayList<>();
     private final List<HttpSessionIdListener> sess_id_listeners_ = new ArrayList<>();
     private final List<HttpSessionListener> sess_listeners_ = new ArrayList<>();
@@ -2202,6 +2204,10 @@ public class Context implements ServletContext, InitParams
             attr_listener_ = new SessionAttrListener();
         }
 
+        if (!req_attr_listeners_.isEmpty()) {
+            req_attr_listener_ = new RequestAttrListener();
+        }
+
         ClassLoader old = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(loader_);
 
@@ -3191,45 +3197,35 @@ public class Context implements ServletContext, InitParams
         log("setResponseCharacterEncoding: " + encoding);
     }
 
-    public void requestAttributeAdded(Request r, String name, Object value)
+    private class RequestAttrListener implements ServletRequestAttributeListener
     {
-        if (req_attr_listeners_.isEmpty()) {
-            return;
+        @Override
+        public void attributeAdded(ServletRequestAttributeEvent srae)
+        {
+            for (ServletRequestAttributeListener l : req_attr_listeners_) {
+                l.attributeAdded(srae);
+            }
         }
 
-        ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
-            this, r, name, value);
+        @Override
+        public void attributeReplaced(ServletRequestAttributeEvent srae)
+        {
+            for (ServletRequestAttributeListener l : req_attr_listeners_) {
+                l.attributeReplaced(srae);
+            }
+        }
 
-        for (ServletRequestAttributeListener l : req_attr_listeners_) {
-            l.attributeAdded(srae);
+        @Override
+        public void attributeRemoved(ServletRequestAttributeEvent srae)
+        {
+            for (ServletRequestAttributeListener l : req_attr_listeners_) {
+                l.attributeRemoved(srae);
+            }
         }
     }
 
-    public void requestAttributeReplaced(Request r, String name, Object value)
+    public ServletRequestAttributeListener getRequestAttributeListener()
     {
-        if (req_attr_listeners_.isEmpty()) {
-            return;
-        }
-
-        ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
-            this, r, name, value);
-
-        for (ServletRequestAttributeListener l : req_attr_listeners_) {
-            l.attributeReplaced(srae);
-        }
-    }
-
-    public void requestAttributeRemoved(Request r, String name, Object value)
-    {
-        if (req_attr_listeners_.isEmpty()) {
-            return;
-        }
-
-        ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
-            this, r, name, value);
-
-        for (ServletRequestAttributeListener l : req_attr_listeners_) {
-            l.attributeRemoved(srae);
-        }
+        return req_attr_listener_;
     }
 }

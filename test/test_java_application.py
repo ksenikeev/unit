@@ -350,6 +350,63 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
 
         self.assertEqual(headers['X-App-Servlet'], '1', 'URL pattern overrides welcome file')
 
+    def test_java_application_request_listeners(self):
+        self.load('request_listeners')
+
+        headers = self.get(url='/test1')['headers']
+
+        self.assertEqual(headers['X-Request-Initialized'], '/test1',
+            'request initialized event')
+        self.assertEqual(headers['X-Request-Destroyed'], '',
+            'request destroyed event')
+        self.assertEqual(headers['X-Attr-Added'], '',
+            'attribute added event')
+        self.assertEqual(headers['X-Attr-Removed'], '',
+            'attribute removed event')
+        self.assertEqual(headers['X-Attr-Replaced'], '',
+            'attribute replaced event')
+
+
+        headers = self.get(url='/test2?var1=1')['headers']
+
+        self.assertEqual(headers['X-Request-Initialized'], '/test2',
+            'request initialized event')
+        self.assertEqual(headers['X-Request-Destroyed'], '/test1',
+            'request destroyed event')
+        self.assertEqual(headers['X-Attr-Added'], 'var=1;',
+            'attribute added event')
+        self.assertEqual(headers['X-Attr-Removed'], 'var=1;',
+            'attribute removed event')
+        self.assertEqual(headers['X-Attr-Replaced'], '',
+            'attribute replaced event')
+
+
+        headers = self.get(url='/test3?var1=1&var2=2')['headers']
+
+        self.assertEqual(headers['X-Request-Initialized'], '/test3',
+            'request initialized event')
+        self.assertEqual(headers['X-Request-Destroyed'], '/test2',
+            'request destroyed event')
+        self.assertEqual(headers['X-Attr-Added'], 'var=1;',
+            'attribute added event')
+        self.assertEqual(headers['X-Attr-Removed'], 'var=2;',
+            'attribute removed event')
+        self.assertEqual(headers['X-Attr-Replaced'], 'var=1;',
+            'attribute replaced event')
+
+
+        headers = self.get(url='/test4?var1=1&var2=2&var3=3')['headers']
+
+        self.assertEqual(headers['X-Request-Initialized'], '/test4',
+            'request initialized event')
+        self.assertEqual(headers['X-Request-Destroyed'], '/test3',
+            'request destroyed event')
+        self.assertEqual(headers['X-Attr-Added'], 'var=1;',
+            'attribute added event')
+        self.assertEqual(headers['X-Attr-Removed'], '',
+            'attribute removed event')
+        self.assertEqual(headers['X-Attr-Replaced'], 'var=1;var=2;',
+            'attribute replaced event')
 
 
 if __name__ == '__main__':
