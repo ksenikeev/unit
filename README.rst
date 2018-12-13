@@ -11,7 +11,7 @@ Currently, you can try the code directly from this repository:
     # cd unit
     # ./configure --prefix=/home/user/unit_local_setup
 
-Refer to General Unit Guide for ./configure details:
+Refer to General Unit Guide for ``./configure`` details:
 http://unit.nginx.org/installation/#configuring-sources
 
 .. code-block:: console
