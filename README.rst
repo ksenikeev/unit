@@ -9,7 +9,7 @@ Currently, you can try the code directly from this repository:
 
     # git clone -b java https://github.com/mar0x/unit.git
     # cd unit
-    # ./configure --prefix=/home/user/unit_local_setup
+    # ./configure --debug --prefix=/home/user/unit_local_setup
 
 Refer to General Unit Guide for ``./configure`` details:
 http://unit.nginx.org/installation/#configuring-sources
