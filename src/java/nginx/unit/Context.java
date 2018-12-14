@@ -222,6 +222,13 @@ public class Context implements ServletContext, InitParams
     private class StaticServlet extends HttpServlet
     {
         @Override
+        public void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException
+        {
+            doGet(request, response);
+        }
+
+        @Override
         public void doGet(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException
         {
