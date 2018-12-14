@@ -234,6 +234,25 @@ public class Context implements ServletContext, InitParams
         {
             String path = request.getServletPath();
 
+            /*
+                10.6 Web Application Archive File
+                ...
+                This directory [META-INF] must not be directly served as
+                content by the container in response to a Web client’s request,
+                though its contents are visible to servlet code via the
+                getResource and getResourceAsStream calls on the
+                ServletContext. Also, any requests to access the resources in
+                META-INF directory must be returned with a SC_NOT_FOUND(404)
+                response.
+             */
+            if (request.getDispatcherType() == DispatcherType.REQUEST
+                && (path.equals("/WEB-INF") || path.startsWith("/WEB-INF/")
+                    || path.equals("/META-INF") || path.startsWith("/META-INF/")))
+            {
+                response.sendError(response.SC_NOT_FOUND);
+                return;
+            }
+
             if (path.startsWith("/")) {
                 path = path.substring(1);
             }
@@ -382,9 +401,6 @@ public class Context implements ServletContext, InitParams
             if (!metadata_complete_) {
                 scanClasses(scan_res);
             }
-
-            parseURLPattern("/WEB-INF/*", null);
-            parseURLPattern("/META-INF/*", null);
 
             /*
                 8.1.6 Other annotations / conventions
