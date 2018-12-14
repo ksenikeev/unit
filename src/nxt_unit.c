@@ -1122,7 +1122,7 @@ nxt_unit_response_realloc(nxt_unit_request_info_t *req,
     f = resp->fields;
 
     for (i = 0; i < req->response->fields_count; i++) {
-        src = req->request->fields + i;
+        src = req->response->fields + i;
 
         if (nxt_slow_path(src->skip != 0)) {
             continue;
