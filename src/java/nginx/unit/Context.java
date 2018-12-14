@@ -627,77 +627,53 @@ public class Context implements ServletContext, InitParams
             ...
          */
         if (path.endsWith("/")) {
+
+            /*
+                The Web server must append each welcome file in the order
+                specified in the deployment descriptor to the partial request
+                and check whether a static resource in the WAR is mapped to
+                that request URI.
+             */
             for (String wf : welcome_files_) {
                 String wpath = path + wf;
 
-                /*
-                    The Web server must append each welcome file in the order
-                    specified in the deployment descriptor to the partial
-                    request and check whether a static resource in the WAR is
-                    mapped to that request URI. If no match is found, ...
-                 */
+                File f = new File(webapp_, wpath.substring(1));
+                if (!f.exists()) {
+                    continue;
+                }
+
+                trace("findServlet: '" + path + "' found static welcome "
+                      + "file '" + wf + "'");
 
                 /*
-                    Looking for and serving static content is inconsistent
-                    with url pattern matching functionality. Tomcat, Jetty and
-                    Resin not served static files when url pattern matched.
+                    Even if static file found, we should try to find matching
+                    servlet for JSP serving etc.
                  */
-
-                /*
-                    ... the Web server MUST again append each welcome file
-                    in the order specified in the deployment descriptor to
-                    the partial request and check if a servlet is mapped
-                    to that request URI. The Web container must send the
-                    request to the first resource in the WAR that matches.
-                 */
-
-                servlet = exact2servlet_.get(wpath);
+                servlet = findWelcomeServlet(wpath, true, req);
                 if (servlet != null) {
-                    trace("findServlet: '" + wpath + "' exact matched pattern");
-                    if (req != null) {
-                        req.setServletPath(wpath, null);
-                    }
                     return servlet;
                 }
 
-                suffix_start = wpath.lastIndexOf('.');
-                if (suffix_start != -1) {
-                    String suffix = wpath.substring(suffix_start);
-                    servlet = suffix2servlet_.get(suffix);
-                    if (servlet != null) {
-                        trace("findServlet: '" + wpath + "' matched suffix pattern");
-
-                        /*
-                            If we want to show the directory content when
-                            index.jsp is absent, then we have to check file
-                            presence here. Otherwise user will get 404.
-                         */
-
-                        if (servlet instanceof JspServletReg) {
-                            File f = new File(webapp_, wpath.substring(1));
-                            if (!f.exists()) {
-                                trace("findServlet: '" + wpath + "' not exists");
-                                continue;
-                            }
-                        }
-
-                        if (req != null) {
-                            req.setServletPath(wpath, null);
-                        }
-                        return servlet;
-                    }
+                if (req != null) {
+                    req.setServletPath(wpath, null);
                 }
 
-                File f = new File(webapp_, wpath.substring(1));
-                if (f.exists()) {
-                    trace("findServlet: '" + path + "' found static welcome "
-                          + "file '" + wf + "' system default servlet");
+                return system_default_servlet_;
+            }
 
-                    if (req != null) {
-                        req.setServletPath(wpath, null);
-                    }
+            /*
+                If no match is found, the Web server MUST again append each
+                welcome file in the order specified in the deployment
+                descriptor to the partial request and check if a servlet is
+                mapped to that request URI. The Web container must send the
+                request to the first resource in the WAR that matches.
+             */
+            for (String wf : welcome_files_) {
+                String wpath = path + wf;
 
-                    return system_default_servlet_;
+                servlet = findWelcomeServlet(wpath, false, req);
+                if (servlet != null) {
+                    return servlet;
                 }
             }
         }
@@ -713,6 +689,48 @@ public class Context implements ServletContext, InitParams
             req.setServletPath(path, null);
         }
         return system_default_servlet_;
+    }
+
+    private ServletReg findWelcomeServlet(String path, boolean exists,
+        DynamicPathRequest req)
+    {
+        ServletReg servlet = exact2servlet_.get(path);
+        if (servlet != null) {
+            trace("findWelcomeServlet: '" + path + "' exact matched pattern");
+            if (req != null) {
+                req.setServletPath(path, null);
+            }
+            return servlet;
+        }
+
+        int suffix_start = path.lastIndexOf('.');
+        if (suffix_start == -1) {
+            return null;
+        }
+
+        String suffix = path.substring(suffix_start);
+        servlet = suffix2servlet_.get(suffix);
+        if (servlet == null) {
+            return null;
+        }
+
+        trace("findWelcomeServlet: '" + path + "' matched suffix pattern");
+
+        /*
+            If we want to show the directory content when
+            index.jsp is absent, then we have to check file
+            presence here. Otherwise user will get 404.
+         */
+
+        if (servlet instanceof JspServletReg && !exists) {
+            trace("findWelcomeServlet: '" + path + "' not exists");
+            return null;
+        }
+
+        if (req != null) {
+            req.setServletPath(path, null);
+        }
+        return servlet;
     }
 
     public void service(Request req, Response resp)

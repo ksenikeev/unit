@@ -350,6 +350,22 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
 
         self.assertEqual(headers['X-App-Servlet'], '1', 'URL pattern overrides welcome file')
 
+
+        headers = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/dir4/')['headers']
+
+        self.assertEqual('X-App-Servlet' in headers, False, 'Static welcome file served first')
+
+
+        headers = self.get(headers={
+            'Host': 'localhost',
+            'Connection': 'close'
+        }, url='/dir5/')['headers']
+
+        self.assertEqual(headers['X-App-Servlet'], '1', 'Servlet for welcome file served when no static file found')
+
     def test_java_application_request_listeners(self):
         self.load('request_listeners')
 

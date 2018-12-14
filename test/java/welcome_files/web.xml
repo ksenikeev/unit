@@ -19,6 +19,8 @@
     <servlet-mapping>
         <servlet-name>app</servlet-name>
         <url-pattern>/dir3/index.txt</url-pattern>
+        <url-pattern>/dir4/index.txt</url-pattern>
+        <url-pattern>/dir5/index.html</url-pattern>
     </servlet-mapping>
 
 </web-app>
