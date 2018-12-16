@@ -2832,6 +2832,11 @@ public class Context implements ServletContext, InitParams
 
             if (s != null) {
                 s.accessed();
+
+                if (s.checkTimeOut()) {
+                    s.invalidate();
+                    return null;
+                }
             }
 
             return s;
@@ -2840,7 +2845,8 @@ public class Context implements ServletContext, InitParams
 
     public Session createSession()
     {
-        Session session = new Session(this, generateSessionId(), sess_attr_proxy_);
+        Session session = new Session(this, generateSessionId(),
+                                      sess_attr_proxy_, session_timeout_ * 60);
 
         if (!sess_listeners_.isEmpty())
         {
