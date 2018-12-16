@@ -22,15 +22,12 @@ public class app extends HttpServlet
         @Override
         public void init(FilterConfig filterConfig)
         {
-            System.out.println("filter.init");
         }
 
         @Override
         public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException
         {
-            System.out.println("filter.doFilter");
-
             response.getOutputStream().println("Extra Info");
             response.setCharacterEncoding("utf-8");
 
@@ -44,7 +41,6 @@ public class app extends HttpServlet
         @Override
         public void destroy()
         {
-            System.out.println("filter.destroy");
         }
     }
 

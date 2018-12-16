@@ -34,6 +34,8 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletRequest;
+import javax.servlet.ServletRequestAttributeEvent;
+import javax.servlet.ServletRequestAttributeListener;
 import javax.servlet.ServletResponse;
 import javax.servlet.SessionTrackingMode;
 import javax.servlet.SessionCookieConfig;
@@ -97,10 +99,14 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     private boolean request_session_id_from_url = false;
     private Session session = null;
 
+    private final ServletRequestAttributeListener attr_listener;
+
     public Request(Context ctx, long req_info, long req) {
         context = ctx;
         req_info_ptr = req_info;
         req_ptr = req;
+
+        attr_listener = context.getRequestAttributeListener();
     }
 
     @Override
@@ -902,9 +908,14 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         trace("removeAttribute: " + name);
 
-        Object value = attributes.remove(name);
+        Object prev = attributes.remove(name);
 
-        context.requestAttributeRemoved(this, name, value);
+        if (attr_listener == null || prev == null) {
+            return;
+        }
+
+        attr_listener.attributeRemoved(
+            new ServletRequestAttributeEvent(context, this, name, prev));
     }
 
     @Override
@@ -912,12 +923,33 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         trace("setAttribute: " + name + ", " + o);
 
-        Object prev = attributes.put(name, o);
+        Object prev;
+
+        if (o != null) {
+            prev = attributes.put(name, o);
+        } else {
+            prev = attributes.remove(name);
+        }
+
+        if (attr_listener == null) {
+            return;
+        }
 
         if (prev == null) {
-            context.requestAttributeAdded(this, name, o);
+            if (o == null) {
+                return;
+            }
+
+            attr_listener.attributeAdded(new ServletRequestAttributeEvent(
+                context, this, name, o));
         } else {
-            context.requestAttributeReplaced(this, name, prev);
+            if (o != null) {
+                attr_listener.attributeReplaced(
+                    new ServletRequestAttributeEvent(context, this, name, prev));
+            } else {
+                attr_listener.attributeRemoved(
+                    new ServletRequestAttributeEvent(context, this, name, prev));
+            }
         }
     }
 

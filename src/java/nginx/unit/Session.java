@@ -21,20 +21,21 @@ public class Session implements HttpSession, Serializable
 {
     private final Map<String, Object> attributes = new HashMap<>();
     private final long creation_time = new Date().getTime();
-    private long last_access_time = 0;
+    private long last_access_time = creation_time;
     private long access_time = creation_time;
-    private int max_inactive_interval =0 ; // in seconds
+    private int max_inactive_interval;
     private String id;
     private final Context context;
     private boolean is_new = true;
     private final HttpSessionAttributeListener attr_listener;
 
-    public Session(Context context, String id, HttpSessionAttributeListener al)
+    public Session(Context context, String id,
+        HttpSessionAttributeListener al, int max_inactive_interval)
     {
         this.id = id;
         this.context = context;
         attr_listener = al;
-        max_inactive_interval = context.getSessionTimeout()*60;
+        this.max_inactive_interval = max_inactive_interval;
     }
 
     public void setId(String id)
@@ -242,7 +243,9 @@ public class Session implements HttpSession, Serializable
         }
     }
 
-    public boolean checkTimeOut(){
-        return (access_time - last_access_time > max_inactive_interval*1000);
+    public boolean checkTimeOut()
+    {
+        return (max_inactive_interval > 0) &&
+                (access_time - last_access_time > max_inactive_interval * 1000);
     }
 }

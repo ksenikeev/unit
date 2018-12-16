@@ -344,7 +344,9 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     data.ctx = nxt_java_startContext(env, c->webapp, classpaths, jsps);
 
     if ((*env)->ExceptionCheck(env)) {
+        nxt_alert(task, "Unhandled exception in application start");
         (*env)->ExceptionDescribe(env);
+        return NXT_ERROR;
     }
 
     nxt_unit_default_init(task, &java_init);
