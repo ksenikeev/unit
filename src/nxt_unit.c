@@ -1108,6 +1108,7 @@ nxt_unit_response_realloc(nxt_unit_request_info_t *req,
 
     buf = nxt_unit_response_buf_alloc(req, buf_size);
     if (nxt_slow_path(buf == NULL)) {
+        nxt_unit_req_warn(req, "realloc: new buf allocation failed");
         return NXT_UNIT_ERROR;
     }
 
@@ -1131,6 +1132,10 @@ nxt_unit_response_realloc(nxt_unit_request_info_t *req,
         if (nxt_slow_path(src->name_length + src->value_length
                           > (uint32_t) (buf->end - p)))
         {
+            nxt_unit_req_warn(req, "realloc: not enough space for field"
+                  " #%"PRIu32" (%p), (%"PRIu32" + %"PRIu32") required",
+                  i, src, src->name_length, src->value_length);
+
             goto fail;
         }
 
@@ -1153,6 +1158,10 @@ nxt_unit_response_realloc(nxt_unit_request_info_t *req,
         if (nxt_slow_path(req->response->piggyback_content_length
                           > (uint32_t) (buf->end - p)))
         {
+            nxt_unit_req_warn(req, "realloc: not enought space for content"
+                  " #%"PRIu32", %"PRIu32" required",
+                  i, req->response->piggyback_content_length);
+
             goto fail;
         }
 
