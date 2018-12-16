@@ -1,4 +1,3 @@
-
 package nginx.unit;
 
 import io.github.classgraph.ClassGraph;
@@ -176,11 +175,13 @@ public class Context implements ServletContext, InitParams
     private final List<ServletRequestListener> req_destroy_listeners_ = new ArrayList<>();
     private final List<ServletRequestAttributeListener> req_attr_listeners_ = new ArrayList<>();
 
+    private ServletRequestAttributeListener req_attr_proxy_ = null;
+
     private final List<HttpSessionAttributeListener> sess_attr_listeners_ = new ArrayList<>();
     private final List<HttpSessionIdListener> sess_id_listeners_ = new ArrayList<>();
     private final List<HttpSessionListener> sess_listeners_ = new ArrayList<>();
 
-    private SessionAttrListener attr_listener_ = null;
+    private HttpSessionAttributeListener sess_attr_proxy_ = null;
 
     private final SessionCookieConfig session_cookie_config_ = new UnitSessionCookieConfig();
     private final Set<SessionTrackingMode> default_session_tracking_modes_ = new HashSet<>();
@@ -2200,7 +2201,11 @@ public class Context implements ServletContext, InitParams
     private void initialized()
     {
         if (!sess_attr_listeners_.isEmpty()) {
-            attr_listener_ = new SessionAttrListener();
+            sess_attr_proxy_ = new SessionAttrProxy(sess_attr_listeners_);
+        }
+
+        if (!req_attr_listeners_.isEmpty()) {
+            req_attr_proxy_ = new RequestAttrProxy(req_attr_listeners_);
         }
 
         ClassLoader old = Thread.currentThread().getContextClassLoader();
@@ -2827,26 +2832,15 @@ public class Context implements ServletContext, InitParams
 
             if (s != null) {
                 s.accessed();
-                s = checkTimeOut(s);
             }
 
             return s;
         }
     }
 
-    private Session checkTimeOut(Session s)
-    {
-        if (s.checkTimeOut()) {
-            s.invalidate();
-            return null;
-        }
-
-        return s;
-    }
-
     public Session createSession()
     {
-        Session session = new Session(this, generateSessionId(), attr_listener_);
+        Session session = new Session(this, generateSessionId(), sess_attr_proxy_);
 
         if (!sess_listeners_.isEmpty())
         {
@@ -2908,33 +2902,6 @@ public class Context implements ServletContext, InitParams
     private String generateSessionId()
     {
         return UUID.randomUUID().toString();
-    }
-
-    private class SessionAttrListener implements HttpSessionAttributeListener
-    {
-        @Override
-        public void attributeAdded(HttpSessionBindingEvent event)
-        {
-            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
-                l.attributeAdded(event);
-            }
-        }
-
-        @Override
-        public void attributeRemoved(HttpSessionBindingEvent event)
-        {
-            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
-                l.attributeRemoved(event);
-            }
-        }
-
-        @Override
-        public void attributeReplaced(HttpSessionBindingEvent event)
-        {
-            for (HttpSessionAttributeListener l : sess_attr_listeners_) {
-                l.attributeReplaced(event);
-            }
-        }
     }
 
     @Override
@@ -3203,45 +3170,8 @@ public class Context implements ServletContext, InitParams
         log("setResponseCharacterEncoding: " + encoding);
     }
 
-    public void requestAttributeAdded(Request r, String name, Object value)
+    public ServletRequestAttributeListener getRequestAttributeListener()
     {
-        if (req_attr_listeners_.isEmpty()) {
-            return;
-        }
-
-        ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
-                this, r, name, value);
-
-        for (ServletRequestAttributeListener l : req_attr_listeners_) {
-            l.attributeAdded(srae);
-        }
-    }
-
-    public void requestAttributeReplaced(Request r, String name, Object value)
-    {
-        if (req_attr_listeners_.isEmpty()) {
-            return;
-        }
-
-        ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
-                this, r, name, value);
-
-        for (ServletRequestAttributeListener l : req_attr_listeners_) {
-            l.attributeReplaced(srae);
-        }
-    }
-
-    public void requestAttributeRemoved(Request r, String name, Object value)
-    {
-        if (req_attr_listeners_.isEmpty()) {
-            return;
-        }
-
-        ServletRequestAttributeEvent srae = new ServletRequestAttributeEvent(
-                this, r, name, value);
-
-        for (ServletRequestAttributeListener l : req_attr_listeners_) {
-            l.attributeRemoved(srae);
-        }
+        return req_attr_proxy_;
     }
 }
