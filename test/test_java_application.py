@@ -604,5 +604,24 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual(headers['X-Resource-As-Stream'], 'null',
             'no resource stream')
 
+    def test_java_application_query_string(self):
+        self.load('query_string')
+
+        headers = self.get(url='/?a=b')['headers']
+
+        self.assertEqual(headers['X-Query-String'], 'a=b',
+            'non-empty query string')
+
+        headers = self.get(url='/?')['headers']
+
+        self.assertEqual(headers['X-Query-String'], '',
+            'empty query string')
+
+        headers = self.get(url='/')['headers']
+
+        self.assertEqual(headers['X-Query-String'], 'null',
+            'absent query string')
+
+
 if __name__ == '__main__':
     unittest.main()
