@@ -293,14 +293,16 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         return path_info;
     }
 
-
     @Override
     public String getPathTranslated()
     {
-        log("getPathTranslated");
+        trace("getPathTranslated");
 
-        /* TODO */
-        return null;
+        if (path_info == null) {
+            return null;
+        }
+
+        return context.getRealPath(path_info);
     }
 
     @Override
@@ -816,9 +818,9 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Deprecated
     public String getRealPath(String path)
     {
-        log("getRealPath: " + path);
+        trace("getRealPath: " + path);
 
-        return null;
+        return context.getRealPath(path);
     }
 
     @Override

@@ -2611,11 +2611,7 @@ public class Context implements ServletContext, InitParams
 
         File f = new File(webapp_, path.substring(1));
 
-        if (f.exists()) {
-            return f.getAbsolutePath();
-        }
-
-        return null;
+        return f.getAbsolutePath();
     }
 
     @Override

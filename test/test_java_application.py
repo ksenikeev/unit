@@ -570,5 +570,39 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual('After include' in body, True,
             'add data after forward() call')
 
+    def test_java_application_path_translation(self):
+        self.load('path_translation')
+
+        headers = self.get(url='/pt/test?path=/')['headers']
+
+        self.assertEqual(headers['X-Servlet-Path'], '/pt',
+            'matched servlet path')
+        self.assertEqual(headers['X-Path-Info'], '/test',
+            'the rest of the path')
+        self.assertEqual(headers['X-Path-Translated'],
+            headers['X-Real-Path'] + headers['X-Path-Info'],
+            'translated path is the app root + path info')
+        self.assertEqual(
+            headers['X-Resource-Paths'].endswith('/WEB-INF/, /index.html]'),
+            True, 'app root directory content')
+        self.assertEqual(headers['X-Resource-As-Stream'], 'null',
+            'no resource stream for root path')
+
+
+        headers = self.get(url='/test?path=/none')['headers']
+
+        self.assertEqual(headers['X-Servlet-Path'], '/test',
+            'matched whole path')
+        self.assertEqual(headers['X-Path-Info'], 'null',
+            'the rest of the path is null, whole path matched')
+        self.assertEqual(headers['X-Path-Translated'], 'null',
+            'translated path is null because path info is null')
+        self.assertEqual(headers['X-Real-Path'].endswith('/none'), True,
+            'read path is not null')
+        self.assertEqual(headers['X-Resource-Paths'], 'null',
+            'no resource found')
+        self.assertEqual(headers['X-Resource-As-Stream'], 'null',
+            'no resource stream')
+
 if __name__ == '__main__':
     unittest.main()
