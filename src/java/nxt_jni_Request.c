@@ -37,9 +37,6 @@ static jint JNICALL nxt_java_Request_getIntHeader(JNIEnv *env, jclass cls,
 static jstring JNICALL nxt_java_Request_getMethod(JNIEnv *env, jclass cls,
     jlong req_ptr);
 
-static jstring JNICALL nxt_java_Request_getPathInfo(JNIEnv *env, jclass cls,
-    jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getQueryString(JNIEnv *env, jclass cls,
     jlong req_ptr);
 
@@ -132,10 +129,6 @@ nxt_java_initRequest(JNIEnv *env, jobject cl)
         { (char *) "getMethod",
           (char *) "(J)Ljava/lang/String;",
           nxt_java_Request_getMethod },
-
-        { (char *) "getPathInfo",
-          (char *) "(J)Ljava/lang/String;",
-          nxt_java_Request_getPathInfo },
 
         { (char *) "getQueryString",
           (char *) "(J)Ljava/lang/String;",
@@ -362,17 +355,6 @@ nxt_java_Request_getMethod(JNIEnv *env, jclass cls, jlong req_ptr)
     r = (nxt_unit_request_t *) req_ptr;
 
     return (*env)->NewStringUTF(env, nxt_unit_sptr_get(&r->method));
-}
-
-
-static jstring JNICALL
-nxt_java_Request_getPathInfo(JNIEnv *env, jclass cls, jlong req_ptr)
-{
-    nxt_unit_request_t  *r;
-
-    r = (nxt_unit_request_t *) req_ptr;
-
-    return nxt_java_newString(env, nxt_unit_sptr_get(&r->path), r->path_length);
 }
 
 

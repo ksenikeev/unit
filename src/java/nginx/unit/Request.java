@@ -293,8 +293,6 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         return path_info;
     }
 
-    private static native String getPathInfo(long req_ptr);
-
 
     @Override
     public String getPathTranslated()
