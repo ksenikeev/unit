@@ -33,14 +33,16 @@ public class Response implements HttpServletResponse {
 
     private long req_info_ptr;
 
-    private final String defaultCharacterEncoding = "iso-8859-1";
+    private static final String defaultCharacterEncoding = "iso-8859-1";
     private String characterEncoding = defaultCharacterEncoding;
     private String contentType = null;
 
-    private final Charset ISO_8859_1 = StandardCharsets.ISO_8859_1;
-    private final Charset UTF_8 = StandardCharsets.UTF_8;
+    private static final Charset ISO_8859_1 = StandardCharsets.ISO_8859_1;
+    private static final Charset UTF_8 = StandardCharsets.UTF_8;
 
-    private final String CONTENT_TYPE = "Content-Type";
+    private static final String CONTENT_TYPE = "Content-Type";
+    private static final byte[] SET_COOKIE_BYTES = "Set-Cookie".getBytes(ISO_8859_1);
+    private static final byte[] EXPIRES_BYTES = "Expires".getBytes(ISO_8859_1);
 
     /**
      * The only date format permitted when generating HTTP headers.
@@ -50,6 +52,9 @@ public class Response implements HttpServletResponse {
 
     private static final SimpleDateFormat format =
             new SimpleDateFormat(RFC1123_DATE, Locale.US);
+
+    private static final String ZERO_DATE_STRING = dateToString(0);
+    private static final byte[] ZERO_DATE_BYTES = ZERO_DATE_STRING.getBytes(ISO_8859_1);
 
     /**
      * If this string is found within the comment of a cookie added with {@link #addCookie(Cookie)}, then the cookie
@@ -117,7 +122,7 @@ public class Response implements HttpServletResponse {
             // This is required as some browser (M$ this means you!) don't handle max-age even with v1 cookies
             buf.append(";Expires=");
             if (maxAge == 0)
-                buf.append(dateToString(0));
+                buf.append(ZERO_DATE_STRING);
             else
                 buf.append(dateToString(System.currentTimeMillis() + 1000L * maxAge));
 
@@ -132,10 +137,11 @@ public class Response implements HttpServletResponse {
             buf.append(";HttpOnly");
 
         // add the set cookie
-        addHeader("Set-Cookie", buf.toString());
+        addHeader(req_info_ptr, SET_COOKIE_BYTES,
+            buf.toString().getBytes(ISO_8859_1));
 
         // Expire responses with set-cookie headers so they do not get cached.
-        setDateHeader("Expires", 0);
+        setHeader(req_info_ptr, EXPIRES_BYTES, ZERO_DATE_BYTES);
     }
 
     @Override
@@ -143,23 +149,24 @@ public class Response implements HttpServletResponse {
     {
         trace("addCookie: " + cookie.getName() + "=" + cookie.getValue());
 
+        if (StringUtil.isBlank(cookie.getName())) {
+            throw new IllegalArgumentException("Cookie.name cannot be blank/null");
+        }
+
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
+
+        addCookie_(cookie);
+    }
+
+    private void addCookie_(Cookie cookie)
+    {
         String comment = cookie.getComment();
         boolean httpOnly = false;
 
-        if (comment != null) {
-            int i = comment.indexOf(HTTP_ONLY_COMMENT);
-            if (i >= 0) {
-                httpOnly = true;
-                comment = comment.replace(HTTP_ONLY_COMMENT, "").trim();
-                if (comment.length() == 0) {
-                    comment = null;
-                }
-            }
-        }
-
-        if (StringUtil.isBlank(cookie.getName()))
-        {
-            throw new IllegalArgumentException("Cookie.name cannot be blank/null");
+        if (comment != null && comment.contains(HTTP_ONLY_COMMENT)) {
+            httpOnly = true;
         }
 
         addSetRFC6265Cookie(cookie.getName(),
@@ -171,10 +178,33 @@ public class Response implements HttpServletResponse {
             httpOnly || cookie.isHttpOnly());
     }
 
+    public void addSessionIdCookie(Cookie cookie)
+    {
+        trace("addSessionIdCookie: " + cookie.getName() + "=" + cookie.getValue());
+
+        if (isCommitted()) {
+            /*
+                9.3 The Include Method
+
+                ... any call to HttpServletRequest.getSession() or
+                HttpServletRequest.getSession(boolean) that would require
+                adding a Cookie response header must throw an
+                IllegalStateException if the response has been committed.
+             */
+            throw new IllegalStateException("Response already sent");
+        }
+
+        addCookie_(cookie);
+    }
+
     @Override
     public void addDateHeader(String name, long date)
     {
         trace("addDateHeader: " + name + ": " + date);
+
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
 
         String value = dateToString(date);
 
@@ -199,6 +229,10 @@ public class Response implements HttpServletResponse {
             return;
         }
 
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
+
         addHeader(req_info_ptr, name.getBytes(ISO_8859_1),
             value.getBytes(ISO_8859_1));
     }
@@ -210,6 +244,10 @@ public class Response implements HttpServletResponse {
     public void addIntHeader(String name, int value)
     {
         trace("addIntHeader: " + name + ": " + value);
+
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
 
         addIntHeader(req_info_ptr, name.getBytes(ISO_8859_1), value);
     }
@@ -335,13 +373,13 @@ public class Response implements HttpServletResponse {
         if (sc != SC_NO_CONTENT && sc != SC_NOT_MODIFIED &&
             sc != SC_PARTIAL_CONTENT && sc >= SC_OK)
         {
-            request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, sc);
-            request.setAttribute(RequestDispatcher.ERROR_MESSAGE, msg);
-            request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI,
-                                 request.getRequestURI());
+            request.setAttribute_(RequestDispatcher.ERROR_STATUS_CODE, sc);
+            request.setAttribute_(RequestDispatcher.ERROR_MESSAGE, msg);
+            request.setAttribute_(RequestDispatcher.ERROR_REQUEST_URI,
+                                  request.getRequestURI());
 /*
-            request.setAttribute(RequestDispatcher.ERROR_SERVLET_NAME,
-                                 request.getServletName());
+            request.setAttribute_(RequestDispatcher.ERROR_SERVLET_NAME,
+                                  request.getServletName());
 */
         }
 
@@ -373,6 +411,10 @@ public class Response implements HttpServletResponse {
     {
         trace("sendRedirect: " + location);
 
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
+
         /* TODO resolve relative URL to absolute */
 
         sendRedirect(req_info_ptr, location.getBytes(ISO_8859_1));
@@ -386,6 +428,10 @@ public class Response implements HttpServletResponse {
     {
         trace("setDateHeader: " + name + ": " + date);
 
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
+
         String value = dateToString(date);
 
         setHeader(req_info_ptr, name.getBytes(ISO_8859_1),
@@ -397,6 +443,10 @@ public class Response implements HttpServletResponse {
     public void setHeader(String name, String value)
     {
         trace("setHeader: " + name + ": " + value);
+
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
 
         if (CONTENT_TYPE.equalsIgnoreCase(name)) {
             setContentType(value);
@@ -426,6 +476,10 @@ public class Response implements HttpServletResponse {
     {
         trace("setIntHeader: " + name + ": " + value);
 
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
+
         setIntHeader(req_info_ptr, name.getBytes(ISO_8859_1), value);
     }
 
@@ -436,6 +490,10 @@ public class Response implements HttpServletResponse {
     public void setStatus(int sc)
     {
         trace("setStatus: " + sc);
+
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
 
         setStatus(req_info_ptr, sc);
     }
@@ -448,6 +506,10 @@ public class Response implements HttpServletResponse {
     public void setStatus(int sc, String sm)
     {
         trace("setStatus: " + sc + "; " + sm);
+
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
 
         setStatus(req_info_ptr, sc);
     }
@@ -555,6 +617,10 @@ public class Response implements HttpServletResponse {
     {
         trace("reset");
 
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
+
         reset(req_info_ptr);
 
         writer = null;
@@ -569,6 +635,9 @@ public class Response implements HttpServletResponse {
         trace("resetBuffer");
 
         resetBuffer(req_info_ptr);
+
+        writer = null;
+        outputStream = null;
     }
 
     public static native void resetBuffer(long req_info_ptr);
@@ -587,6 +656,10 @@ public class Response implements HttpServletResponse {
     public void setCharacterEncoding(String charset)
     {
         log("setCharacterEncoding " + charset);
+
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
 
         if (charset == null) {
             if (writer != null
@@ -621,6 +694,10 @@ public class Response implements HttpServletResponse {
     {
         trace("setContentLength: " + len);
 
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
+
         setContentLength(req_info_ptr, len);
     }
 
@@ -628,6 +705,10 @@ public class Response implements HttpServletResponse {
     public void setContentLengthLong(long len)
     {
         trace("setContentLengthLong: " + len);
+
+        if (isCommitted() || isIncluding()) {
+            return;
+        }
 
         setContentLength(req_info_ptr, len);
     }

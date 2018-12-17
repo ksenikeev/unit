@@ -424,6 +424,151 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual(headers['X-Attr-Replaced'], 'var=1;var=2;',
             'attribute replaced event')
 
+    def test_java_application_request_uri_forward(self):
+        self.load('forward')
+
+        resp = self.get(url='/fwd?uri=/data/test')
+        headers = resp['headers']
+
+        self.assertEqual(headers['X-REQUEST-Id'], 'fwd',
+            'initial request servlet mapping')
+        self.assertEqual(headers['X-Forward-To'], '/data/test',
+            'forwarding triggered')
+
+        self.assertEqual(headers['X-FORWARD-Id'], 'data',
+            'forward request servlet mapping')
+        self.assertEqual(headers['X-FORWARD-Request-URI'], '/data/test',
+            'forward request uri')
+        self.assertEqual(headers['X-FORWARD-Servlet-Path'], '/data',
+            'forward request servlet path')
+        self.assertEqual(headers['X-FORWARD-Path-Info'], '/test',
+            'forward request path info')
+        self.assertEqual(headers['X-FORWARD-Query-String'], 'uri=/data/test',
+            'forward request query string')
+
+        self.assertEqual(headers['X-javax.servlet.forward.request_uri'], '/fwd',
+            'original request uri')
+        self.assertEqual(headers['X-javax.servlet.forward.context_path'], '',
+            'original request context path')
+        self.assertEqual(headers['X-javax.servlet.forward.servlet_path'], '/fwd',
+            'original request servlet path')
+        self.assertEqual(headers['X-javax.servlet.forward.path_info'], 'null',
+            'original request path info')
+        self.assertEqual(headers['X-javax.servlet.forward.query_string'], 'uri=/data/test',
+            'original request query')
+
+        self.assertEqual('Before forwarding' in resp['body'], False,
+            'discarded data added before forward() call')
+        self.assertEqual('X-After-Forwarding' in headers, False,
+            'cannot add headers after forward() call')
+        self.assertEqual('After forwarding' in resp['body'], False,
+            'cannot add data after forward() call')
+
+    def test_java_application_named_dispatcher_forward(self):
+        self.load('forward')
+
+        resp = self.get(url='/fwd?disp=name&uri=data')
+        headers = resp['headers']
+
+        self.assertEqual(headers['X-REQUEST-Id'], 'fwd',
+            'initial request servlet mapping')
+        self.assertEqual(headers['X-Forward-To'], 'data',
+            'forwarding triggered')
+
+        self.assertEqual(headers['X-FORWARD-Id'], 'data',
+            'forward request servlet mapping')
+        self.assertEqual(headers['X-FORWARD-Request-URI'], '/fwd',
+            'forward request uri')
+        self.assertEqual(headers['X-FORWARD-Servlet-Path'], '/fwd',
+            'forward request servlet path')
+        self.assertEqual(headers['X-FORWARD-Path-Info'], 'null',
+            'forward request path info')
+        self.assertEqual(headers['X-FORWARD-Query-String'], 'disp=name&uri=data',
+            'forward request query string')
+
+        self.assertEqual(headers['X-javax.servlet.forward.request_uri'], 'null',
+            'original request uri')
+        self.assertEqual(headers['X-javax.servlet.forward.context_path'], 'null',
+            'original request context path')
+        self.assertEqual(headers['X-javax.servlet.forward.servlet_path'], 'null',
+            'original request servlet path')
+        self.assertEqual(headers['X-javax.servlet.forward.path_info'], 'null',
+            'original request path info')
+        self.assertEqual(headers['X-javax.servlet.forward.query_string'], 'null',
+            'original request query')
+
+        self.assertEqual('Before forwarding' in resp['body'], False,
+            'discarded data added before forward() call')
+        self.assertEqual('X-After-Forwarding' in headers, False,
+            'cannot add headers after forward() call')
+        self.assertEqual('After forwarding' in resp['body'], False,
+            'cannot add data after forward() call')
+
+    def test_java_application_request_uri_include(self):
+        self.load('include')
+
+        resp = self.get(url='/inc?uri=/data/test')
+        headers = resp['headers']
+        body = resp['body']
+
+        self.assertEqual(headers['X-REQUEST-Id'], 'inc',
+            'initial request servlet mapping')
+        self.assertEqual(headers['X-Include'], '/data/test',
+            'including triggered')
+
+        self.assertEqual('X-INCLUDE-Id' in headers, False,
+            'unable to add headers in include request')
+
+        self.assertEqual('javax.servlet.include.request_uri:  /data/test' in body,
+            True, 'include request uri')
+#        self.assertEqual('javax.servlet.include.context_path: ' in body,
+#            'include request context path')
+        self.assertEqual('javax.servlet.include.servlet_path: /data' in body,
+            True, 'include request servlet path')
+        self.assertEqual('javax.servlet.include.path_info:    /test' in body,
+            True, 'include request path info')
+        self.assertEqual('javax.servlet.include.query_string: null' in body,
+            True, 'include request query')
+
+        self.assertEqual('Before include' in body, True,
+            'preserve data added before include() call')
+        self.assertEqual(headers['X-After-Include'], 'you-should-see-this',
+            'add headers after include() call')
+        self.assertEqual('After include' in body, True,
+            'add data after forward() call')
+
+    def test_java_application_named_dispatcher_include(self):
+        self.load('include')
+
+        resp = self.get(url='/inc?disp=name&uri=data')
+        headers = resp['headers']
+        body = resp['body']
+
+        self.assertEqual(headers['X-REQUEST-Id'], 'inc',
+            'initial request servlet mapping')
+        self.assertEqual(headers['X-Include'], 'data',
+            'including triggered')
+
+        self.assertEqual('X-INCLUDE-Id' in headers, False,
+            'unable to add headers in include request')
+
+        self.assertEqual('javax.servlet.include.request_uri:  null' in body,
+            True, 'include request uri')
+#        self.assertEqual('javax.servlet.include.context_path: null' in body,
+#            'include request context path')
+        self.assertEqual('javax.servlet.include.servlet_path: null' in body,
+            True, 'include request servlet path')
+        self.assertEqual('javax.servlet.include.path_info:    null' in body,
+            True, 'include request path info')
+        self.assertEqual('javax.servlet.include.query_string: null' in body,
+            True, 'include request query')
+
+        self.assertEqual('Before include' in body, True,
+            'preserve data added before include() call')
+        self.assertEqual(headers['X-After-Include'], 'you-should-see-this',
+            'add headers after include() call')
+        self.assertEqual('After include' in body, True,
+            'add data after forward() call')
 
 if __name__ == '__main__':
     unittest.main()

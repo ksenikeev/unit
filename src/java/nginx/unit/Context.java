@@ -232,7 +232,15 @@ public class Context implements ServletContext, InitParams
         public void doGet(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException
         {
-            String path = request.getServletPath();
+            String path = null;
+
+            if (request.getDispatcherType() == DispatcherType.INCLUDE) {
+                path = (String) request.getAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH);
+            }
+
+            if (path == null) {
+                path = request.getServletPath();
+            }
 
             /*
                 10.6 Web Application Archive File
@@ -555,11 +563,6 @@ public class Context implements ServletContext, InitParams
         }
     }
 
-    private ServletReg findServlet(String path)
-    {
-        return findServlet(path, null);
-    }
-
     private ServletReg findServlet(String path, DynamicPathRequest req)
     {
         if (!path.startsWith(context_path_)) {
@@ -578,9 +581,7 @@ public class Context implements ServletContext, InitParams
         ServletReg servlet = exact2servlet_.get(path);
         if (servlet != null) {
             trace("findServlet: '" + path + "' exact matched pattern");
-            if (req != null) {
-                req.setServletPath(path, null);
-            }
+            req.setServletPath(path, null);
             return servlet;
         }
 
@@ -593,14 +594,11 @@ public class Context implements ServletContext, InitParams
         for (PrefixPattern p : prefix_patterns_) {
             if (p.match(path)) {
                 trace("findServlet: '" + path + "' matched prefix pattern '" + p.pattern + "'");
-                if (req != null) {
-                    if (p.pattern.length() == path.length()) {
-                        log("findServlet: WARNING: it is expected '" + path + "' exactly matches " + p.pattern);
-                        req.setServletPath(p.pattern, null);
-                    } else {
-                        req.setServletPath(p.pattern,
-                            path.substring(p.pattern.length()));
-                    }
+                if (p.pattern.length() == path.length()) {
+                    log("findServlet: WARNING: it is expected '" + path + "' exactly matches " + p.pattern);
+                    req.setServletPath(p.pattern, null);
+                } else {
+                    req.setServletPath(p.pattern, path.substring(p.pattern.length()));
                 }
                 return p.servlet;
             }
@@ -618,9 +616,7 @@ public class Context implements ServletContext, InitParams
             servlet = suffix2servlet_.get(suffix);
             if (servlet != null) {
                 trace("findServlet: '" + path + "' matched suffix pattern");
-                if (req != null) {
-                    req.setServletPath(path, null);
-                }
+                req.setServletPath(path, null);
                 return servlet;
             }
         }
@@ -633,9 +629,7 @@ public class Context implements ServletContext, InitParams
          */
         if (default_servlet_ != null) {
             trace("findServlet: '" + path + "' matched default servlet");
-            if (req != null) {
-                req.setServletPath(path, null);
-            }
+            req.setServletPath(path, null);
             return default_servlet_;
         }
 
@@ -677,9 +671,7 @@ public class Context implements ServletContext, InitParams
                     return servlet;
                 }
 
-                if (req != null) {
-                    req.setServletPath(wpath, null);
-                }
+                req.setServletPath(wpath, null);
 
                 return system_default_servlet_;
             }
@@ -708,9 +700,8 @@ public class Context implements ServletContext, InitParams
         }
 
         trace("findServlet: '" + path + "' fallback to system default servlet");
-        if (req != null) {
-            req.setServletPath(path, null);
-        }
+        req.setServletPath(path, null);
+
         return system_default_servlet_;
     }
 
@@ -720,9 +711,8 @@ public class Context implements ServletContext, InitParams
         ServletReg servlet = exact2servlet_.get(path);
         if (servlet != null) {
             trace("findWelcomeServlet: '" + path + "' exact matched pattern");
-            if (req != null) {
-                req.setServletPath(path, null);
-            }
+            req.setServletPath(path, null);
+
             return servlet;
         }
 
@@ -750,9 +740,8 @@ public class Context implements ServletContext, InitParams
             return null;
         }
 
-        if (req != null) {
-            req.setServletPath(path, null);
-        }
+        req.setServletPath(path, null);
+
         return servlet;
     }
 
@@ -858,10 +847,10 @@ public class Context implements ServletContext, InitParams
             if (location != null) {
                 trace("Exception " + e + " matched. Error page location: " + location);
 
-                req.setAttribute(RequestDispatcher.ERROR_EXCEPTION, e);
-                req.setAttribute(RequestDispatcher.ERROR_EXCEPTION_TYPE, e.getClass());
-                req.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
-                req.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, resp.SC_INTERNAL_SERVER_ERROR);
+                req.setAttribute_(RequestDispatcher.ERROR_EXCEPTION, e);
+                req.setAttribute_(RequestDispatcher.ERROR_EXCEPTION_TYPE, e.getClass());
+                req.setAttribute_(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
+                req.setAttribute_(RequestDispatcher.ERROR_STATUS_CODE, resp.SC_INTERNAL_SERVER_ERROR);
 
                 handleError(location, req, resp);
 
@@ -888,7 +877,7 @@ public class Context implements ServletContext, InitParams
         if (location != null) {
             trace("Status " + code + " matched. Error page location: " + location);
 
-            req.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
+            req.setAttribute_(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
 
             handleError(location, req, resp);
         }
@@ -2321,51 +2310,100 @@ public class Context implements ServletContext, InitParams
         return SERVLET_MINOR_VERSION;
     }
 
-    private class CtxRequestDispatcher implements RequestDispatcher
+    private class URIRequestDispatcher implements RequestDispatcher
     {
-        private String uri_;
+        private final URI uri_;
 
-        public CtxRequestDispatcher(String uri)
+        public URIRequestDispatcher(URI uri)
         {
             uri_ = uri;
+        }
+
+        public URIRequestDispatcher(String uri)
+            throws URISyntaxException
+        {
+            uri_ = new URI(uri);
         }
 
         @Override
         public void forward(ServletRequest request, ServletResponse response)
             throws ServletException, IOException
         {
+            /*
+                9.4 The Forward Method
+                ...
+                If the response has been committed, an IllegalStateException
+                must be thrown.
+             */
+            if (response.isCommitted()) {
+                throw new IllegalStateException("Response already committed");
+            }
+
+            ForwardRequestWrapper req = new ForwardRequestWrapper(request);
+
             try {
-                trace("CtxRequestDispatcher.forward");
-                Request r = (Request) request;
+                trace("URIRequestDispatcher.forward");
 
-                String servlet_path = r.getServletPath();
-                String path_info = r.getPathInfo();
-                String req_uri = r.getRequestURI();
-                DispatcherType dtype = r.getDispatcherType();
-
-                URI uri = new URI(req_uri);
-                uri = uri.resolve(uri_);
-
-                r.setRequestURI(uri.getRawPath());
-                r.setDispatcherType(DispatcherType.FORWARD);
-
-                ServletReg servlet = findServlet(uri.getPath(), r);
+                ServletReg servlet = findServlet(uri_.getPath(), req);
 
                 if (servlet == null) {
-                    Response resp = (Response) response;
+                    HttpServletResponse resp = (HttpServletResponse) response;
                     resp.sendError(HttpServletResponse.SC_NOT_FOUND);
 
-                } else {
-                    servlet.service(r, response);
+                    return;
                 }
 
-                r.setServletPath(servlet_path, path_info);
-                r.setRequestURI(req_uri);
-                r.setDispatcherType(dtype);
+                req.setRequestURI(uri_.getRawPath());
+                req.setQueryString(uri_.getRawQuery());
+                req.setDispatcherType(DispatcherType.FORWARD);
 
-                trace("CtxRequestDispatcher.forward done");
-            } catch (URISyntaxException e) {
+                /*
+                    9.4 The Forward Method
+                    ...
+                    If output data exists in the response buffer that has not
+                    been committed, the content must be cleared before the
+                    target servlet’s service method is called.
+                 */
+                response.resetBuffer();
+
+                servlet.service(request, response);
+
+                /*
+                    9.4 The Forward Method
+                    ...
+                    Before the forward method of the RequestDispatcher interface
+                    returns without exception, the response content must be sent
+                    and committed, and closed by the servlet container, unless
+                    the request was put into the asynchronous mode. If an error
+                    occurs in the target of the RequestDispatcher.forward() the
+                    exception may be propagated back through all the calling
+                    filters and servlets and eventually back to the container
+                 */
+                if (!request.isAsyncStarted()) {
+                    response.flushBuffer();
+                }
+
+            /*
+                9.5 Error Handling
+
+                If the servlet that is the target of a request dispatcher
+                throws a runtime exception or a checked exception of type
+                ServletException or IOException, it should be propagated
+                to the calling servlet. All other exceptions should be
+                wrapped as ServletExceptions and the root cause of the
+                exception set to the original exception, as it should
+                not be propagated.
+             */
+            } catch (ServletException e) {
+                throw e;
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
                 throw new ServletException(e);
+            } finally {
+                req.close();
+
+                trace("URIRequestDispatcher.forward done");
             }
         }
 
@@ -2373,32 +2411,42 @@ public class Context implements ServletContext, InitParams
         public void include(ServletRequest request, ServletResponse response)
             throws ServletException, IOException
         {
+            IncludeRequestWrapper req = new IncludeRequestWrapper(request);
+
             try {
-                trace("CtxRequestDispatcher.include");
-                Request r = (Request) request;
+                trace("URIRequestDispatcher.include");
 
-                DispatcherType dtype = request.getDispatcherType();
-
-                r.setDispatcherType(DispatcherType.INCLUDE);
-
-                URI uri = new URI(r.getRequestURI());
-                uri = uri.resolve(uri_);
-
-                ServletReg servlet = findServlet(uri.getPath());
+                ServletReg servlet = findServlet(uri_.getPath(), req);
 
                 if (servlet == null) {
-                    Response resp = (Response) response;
-                    resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+                    /*
+                        9.3 The Include Method
+                        ...
+                        If the default servlet is the target of a
+                        RequestDispatch.include() and the requested resource
+                        does not exist, then the default servlet MUST throw
+                        FileNotFoundException.
+                     */
 
-                } else {
-                    servlet.service(r, response);
+                    throw new FileNotFoundException();
                 }
 
-                r.setDispatcherType(dtype);
+                req.setRequestURI(uri_.getRawPath());
+                req.setQueryString(uri_.getRawQuery());
+                req.setDispatcherType(DispatcherType.INCLUDE);
 
-                trace("CtxRequestDispatcher.include done");
-            } catch (URISyntaxException e) {
+                servlet.service(request, response);
+
+            } catch (ServletException e) {
+                throw e;
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
                 throw new ServletException(e);
+            } finally {
+                req.close();
+
+                trace("URIRequestDispatcher.include done");
             }
         }
     }
@@ -2416,18 +2464,78 @@ public class Context implements ServletContext, InitParams
         public void forward(ServletRequest request, ServletResponse response)
             throws ServletException, IOException
         {
+            /*
+                9.4 The Forward Method
+                ...
+                If the response has been committed, an IllegalStateException
+                must be thrown.
+             */
+            if (response.isCommitted()) {
+                throw new IllegalStateException("Response already committed");
+            }
+
             trace("ServletDispatcher.forward");
-            Request r = (Request) request;
 
-            DispatcherType dtype = r.getDispatcherType();
+            DispatcherType dtype = request.getDispatcherType();
 
-            r.setDispatcherType(DispatcherType.FORWARD);
+            Request req;
+            if (request instanceof Request) {
+                req = (Request) request;
+            } else {
+                req = (Request) request.getAttribute(Request.BARE);
+            }
 
-            servlet_.service(r, response);
+            try {
+                req.setDispatcherType(DispatcherType.FORWARD);
 
-            r.setDispatcherType(dtype);
+                /*
+                    9.4 The Forward Method
+                    ...
+                    If output data exists in the response buffer that has not
+                    been committed, the content must be cleared before the
+                    target servlet’s service method is called.
+                 */
+                response.resetBuffer();
 
-            trace("ServletDispatcher.forward done");
+                servlet_.service(request, response);
+
+                /*
+                    9.4 The Forward Method
+                    ...
+                    Before the forward method of the RequestDispatcher interface
+                    returns without exception, the response content must be sent
+                    and committed, and closed by the servlet container, unless
+                    the request was put into the asynchronous mode. If an error
+                    occurs in the target of the RequestDispatcher.forward() the
+                    exception may be propagated back through all the calling
+                    filters and servlets and eventually back to the container
+                 */
+                if (!request.isAsyncStarted()) {
+                    response.flushBuffer();
+                }
+
+            /*
+                9.5 Error Handling
+
+                If the servlet that is the target of a request dispatcher
+                throws a runtime exception or a checked exception of type
+                ServletException or IOException, it should be propagated
+                to the calling servlet. All other exceptions should be
+                wrapped as ServletExceptions and the root cause of the
+                exception set to the original exception, as it should
+                not be propagated.
+             */
+            } catch (ServletException e) {
+                throw e;
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ServletException(e);
+            } finally {
+                req.setDispatcherType(dtype);
+
+                trace("ServletDispatcher.forward done");
+            }
         }
 
         @Override
@@ -2435,17 +2543,32 @@ public class Context implements ServletContext, InitParams
             throws ServletException, IOException
         {
             trace("ServletDispatcher.include");
-            Request r = (Request) request;
 
             DispatcherType dtype = request.getDispatcherType();
 
-            r.setDispatcherType(DispatcherType.INCLUDE);
+            Request req;
+            if (request instanceof Request) {
+                req = (Request) request;
+            } else {
+                req = (Request) request.getAttribute(Request.BARE);
+            }
 
-            servlet_.service(r, response);
+            try {
+                req.setDispatcherType(DispatcherType.INCLUDE);
 
-            r.setDispatcherType(dtype);
+                servlet_.service(request, response);
 
-            trace("ServletDispatcher.include done");
+            } catch (ServletException e) {
+                throw e;
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ServletException(e);
+            } finally {
+                req.setDispatcherType(dtype);
+
+                trace("ServletDispatcher.include done");
+            }
         }
     }
 
@@ -2466,7 +2589,19 @@ public class Context implements ServletContext, InitParams
     public RequestDispatcher getRequestDispatcher(String uriInContext)
     {
         trace("getRequestDispatcher for " + uriInContext);
-        return new CtxRequestDispatcher(uriInContext);
+        try {
+            return new URIRequestDispatcher(context_path_ + uriInContext);
+        } catch (URISyntaxException e) {
+            log("getRequestDispatcher: failed to create dispatcher: " + e);
+        }
+
+        return null;
+    }
+
+    public RequestDispatcher getRequestDispatcher(URI uri)
+    {
+        trace("getRequestDispatcher for " + uri.getRawPath());
+        return new URIRequestDispatcher(uri);
     }
 
     @Override
