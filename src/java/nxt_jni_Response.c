@@ -337,12 +337,16 @@ nxt_java_get_response_info(jlong req_info_ptr, uint32_t extra_fields,
 
         max_size = 2 * (buf->end - p);
         if (max_size > nxt_unit_buf_max()) {
+            nxt_unit_req_warn(req, "required max_size is too big: %"PRIu32,
+                max_size);
             return NULL;
         }
 
         rc = nxt_unit_response_realloc(req, 2 * req->response_max_fields,
                                        max_size);
         if (rc != NXT_UNIT_OK) {
+            nxt_unit_req_warn(req, "reallocation failed: %"PRIu32", %"PRIu32,
+                2 * req->response_max_fields, max_size);
             return NULL;
         }
     }

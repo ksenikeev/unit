@@ -612,6 +612,9 @@ class TestUnitApplicationJava(TestUnitApplicationProto):
                 src.append(script_path + f)
                 continue
 
+            if f.startswith('.') or f == 'Makefile':
+                continue
+
             if os.path.isdir(script_path + f):
                 if f == 'WEB-INF':
                     continue

@@ -11,6 +11,9 @@ import java.lang.Object;
 import java.lang.String;
 import java.lang.StringBuffer;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
@@ -73,6 +76,8 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     private String servlet_path = "";
     private String path_info = "";
     private String request_uri = null;
+    private String query_string = null;
+    private boolean query_string_valid = false;
 
     private DispatcherType dispatcher_type = DispatcherType.REQUEST;
 
@@ -100,6 +105,8 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     private Session session = null;
 
     private final ServletRequestAttributeListener attr_listener;
+
+    public static final String BARE = "nginx.unit.request.bare";
 
     public Request(Context ctx, long req_info, long req) {
         context = ctx;
@@ -286,16 +293,16 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         return path_info;
     }
 
-    private static native String getPathInfo(long req_ptr);
-
-
     @Override
     public String getPathTranslated()
     {
-        log("getPathTranslated");
+        trace("getPathTranslated");
 
-        /* TODO */
-        return null;
+        if (path_info == null) {
+            return null;
+        }
+
+        return context.getRealPath(path_info);
     }
 
     @Override
@@ -303,11 +310,24 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         trace("getQueryString");
 
-        return getQueryString(req_ptr);
+        if (!query_string_valid) {
+            query_string = getQueryString(req_ptr);
+            query_string_valid = true;
+        }
+
+        return query_string;
     }
 
     private static native String getQueryString(long req_ptr);
 
+    @Override
+    public void setQueryString(String query)
+    {
+        trace("setQueryString: " + query);
+
+        query_string = query;
+        query_string_valid = true;
+    }
 
     @Override
     public String getRemoteUser()
@@ -458,7 +478,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
 
         c.setMaxAge(config.getMaxAge());
 
-        getResponse(req_info_ptr).addCookie(c);
+        getResponse(req_info_ptr).addSessionIdCookie(c);
     }
 
     @Override
@@ -550,6 +570,10 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public Object getAttribute(String name)
     {
+        if (BARE.equals(name)) {
+            return this;
+        }
+
         Object o = attributes.get(name);
 
         trace("getAttribute: " + name + " = " + o);
@@ -622,7 +646,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public DispatcherType getDispatcherType()
     {
-        trace("getDispatcherType");
+        trace("getDispatcherType: " + dispatcher_type);
 
         return dispatcher_type;
     }
@@ -630,6 +654,8 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public void setDispatcherType(DispatcherType type)
     {
+        trace("setDispatcherType: " + type);
+
         dispatcher_type = type;
     }
 
@@ -792,9 +818,9 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Deprecated
     public String getRealPath(String path)
     {
-        log("getRealPath: " + path);
+        trace("getRealPath: " + path);
 
-        return null;
+        return context.getRealPath(path);
     }
 
     @Override
@@ -835,7 +861,16 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         trace("getRequestDispatcher: " + path);
 
-        return context.getRequestDispatcher(path);
+        try {
+            URI uri = new URI(getRequestURI());
+            uri = uri.resolve(path);
+
+            return context.getRequestDispatcher(uri);
+        } catch (URISyntaxException e) {
+            log("getRequestDispatcher: failed to create dispatcher: " + e);
+        }
+
+        return null;
     }
 
 
@@ -950,6 +985,17 @@ public class Request implements HttpServletRequest, DynamicPathRequest
                 attr_listener.attributeRemoved(
                     new ServletRequestAttributeEvent(context, this, name, prev));
             }
+        }
+    }
+
+    public void setAttribute_(String name, Object o)
+    {
+        trace("setAttribute_: " + name + ", " + o);
+
+        if (o != null) {
+            attributes.put(name, o);
+        } else {
+            attributes.remove(name);
         }
     }
 

@@ -148,7 +148,7 @@ public class Context implements ServletContext, InitParams
     private final Map<String, ServletReg> suffix2servlet_ = new HashMap<>();
     private ServletReg default_servlet_;
     private ServletReg system_default_servlet_ = new ServletReg("default",
-            new StaticServlet());
+        new StaticServlet());
 
     private final List<String> welcome_files_ = new ArrayList<>();
 
@@ -156,13 +156,13 @@ public class Context implements ServletContext, InitParams
     private final Map<Integer, String> error2location_ = new HashMap<>();
 
     public static final Class<?>[] LISTENER_TYPES = new Class[] {
-            ServletContextListener.class,
-            ServletContextAttributeListener.class,
-            ServletRequestListener.class,
-            ServletRequestAttributeListener.class,
-            HttpSessionAttributeListener.class,
-            HttpSessionIdListener.class,
-            HttpSessionListener.class
+        ServletContextListener.class,
+        ServletContextAttributeListener.class,
+        ServletRequestListener.class,
+        ServletRequestAttributeListener.class,
+        HttpSessionAttributeListener.class,
+        HttpSessionIdListener.class,
+        HttpSessionListener.class
     };
 
     private final List<String> pending_listener_classnames_ = new ArrayList<>();
@@ -208,8 +208,8 @@ public class Context implements ServletContext, InitParams
         public boolean match(String url)
         {
             return url.startsWith(pattern) && (
-                    url.length() == pattern.length()
-                            || url.charAt(pattern.length()) == '/');
+                url.length() == pattern.length()
+                || url.charAt(pattern.length()) == '/');
         }
 
         @Override
@@ -222,10 +222,44 @@ public class Context implements ServletContext, InitParams
     private class StaticServlet extends HttpServlet
     {
         @Override
-        public void doGet(HttpServletRequest request, HttpServletResponse response)
-                throws IOException, ServletException
+        public void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException
         {
-            String path = request.getServletPath();
+            doGet(request, response);
+        }
+
+        @Override
+        public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException
+        {
+            String path = null;
+
+            if (request.getDispatcherType() == DispatcherType.INCLUDE) {
+                path = (String) request.getAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH);
+            }
+
+            if (path == null) {
+                path = request.getServletPath();
+            }
+
+            /*
+                10.6 Web Application Archive File
+                ...
+                This directory [META-INF] must not be directly served as
+                content by the container in response to a Web client’s request,
+                though its contents are visible to servlet code via the
+                getResource and getResourceAsStream calls on the
+                ServletContext. Also, any requests to access the resources in
+                META-INF directory must be returned with a SC_NOT_FOUND(404)
+                response.
+             */
+            if (request.getDispatcherType() == DispatcherType.REQUEST
+                && (path.equals("/WEB-INF") || path.startsWith("/WEB-INF/")
+                    || path.equals("/META-INF") || path.startsWith("/META-INF/")))
+            {
+                response.sendError(response.SC_NOT_FOUND);
+                return;
+            }
 
             if (path.startsWith("/")) {
                 path = path.substring(1);
@@ -260,7 +294,7 @@ public class Context implements ServletContext, InitParams
                 PrintWriter writer = response.getWriter();
 
                 for (String n : ls) {
-                    writer.println("<a href=\"" + n + "\">" + n + "</a><br>");
+                    writer.println("<a href=\"" + n + "\">" + n + "</a><br>"); 
                 }
 
                 writer.close();
@@ -285,7 +319,7 @@ public class Context implements ServletContext, InitParams
     }
 
     public static Context start(String webapp, URL[] classpaths, URL[] jsps)
-            throws Exception
+        throws Exception
     {
         Context ctx = new Context();
 
@@ -301,12 +335,12 @@ public class Context implements ServletContext, InitParams
     }
 
     public void loadApp(String webapp, URL[] classpaths, URL[] jsps)
-            throws Exception
+        throws Exception
     {
         File root = new File(webapp);
         if (!root.exists()) {
             throw new FileNotFoundException(
-                    "Unable to determine code source archive from " + root);
+                "Unable to determine code source archive from " + root);
         }
 
         ArrayList<URL> url_list = new ArrayList<>();
@@ -346,7 +380,7 @@ public class Context implements ServletContext, InitParams
         processWebXml(root);
 
         loader_ = new CtxClassLoader(urls,
-                Context.class.getClassLoader().getParent());
+            Context.class.getClassLoader().getParent());
 
         ClassLoader old = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(loader_);
@@ -360,14 +394,14 @@ public class Context implements ServletContext, InitParams
 
             if (!metadata_complete_) {
                 scan_res = new ClassGraph()
-                        //.verbose()
-                        .overrideClassLoaders(loader_)
-                        //.ignoreParentClassLoaders()
-                        .enableClassInfo()
-                        .enableAnnotationInfo()
-                        .enableSystemPackages()
-                        //.enableAllInfo()
-                        .scan();
+                    //.verbose()
+                    .overrideClassLoaders(loader_)
+                    //.ignoreParentClassLoaders()
+                    .enableClassInfo()
+                    .enableAnnotationInfo()
+                    .enableSystemPackages()
+                    //.enableAllInfo()
+                    .scan();
 
                 loadInitializers(scan_res);
             }
@@ -375,9 +409,6 @@ public class Context implements ServletContext, InitParams
             if (!metadata_complete_) {
                 scanClasses(scan_res);
             }
-
-            parseURLPattern("/WEB-INF/*", null);
-            parseURLPattern("/META-INF/*", null);
 
             /*
                 8.1.6 Other annotations / conventions
@@ -440,7 +471,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         protected Class<?> loadClass(String name, boolean resolve)
-                throws ClassNotFoundException
+            throws ClassNotFoundException
         {
             // trace("Loader.loadClass: " + name + "; " + resolve);
 
@@ -456,7 +487,7 @@ public class Context implements ServletContext, InitParams
             }
 
             // Try the webapp classloader first
-            // Look in the webapp classloader as a resource, to avoid
+            // Look in the webapp classloader as a resource, to avoid 
             // loading a system class.
             String path = name.replace('.', '/').concat(".class");
             URL webapp_url = findResource(path);
@@ -495,7 +526,7 @@ public class Context implements ServletContext, InitParams
 
             if (!e.isDirectory()) {
                 Files.copy(jf.getInputStream(e), ep,
-                        StandardCopyOption.REPLACE_EXISTING);
+                    StandardCopyOption.REPLACE_EXISTING);
             }
 
             if (mod_time > 0) {
@@ -520,7 +551,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void doFilter (ServletRequest request, ServletResponse response)
-                throws IOException, ServletException
+            throws IOException, ServletException
         {
             if (filter_index_ < filters_.size()) {
                 filters_.get(filter_index_++).filter_.doFilter(request, response, this);
@@ -530,11 +561,6 @@ public class Context implements ServletContext, InitParams
 
             servlet_.service(request, response);
         }
-    }
-
-    private ServletReg findServlet(String path)
-    {
-        return findServlet(path, null);
     }
 
     private ServletReg findServlet(String path, DynamicPathRequest req)
@@ -555,9 +581,7 @@ public class Context implements ServletContext, InitParams
         ServletReg servlet = exact2servlet_.get(path);
         if (servlet != null) {
             trace("findServlet: '" + path + "' exact matched pattern");
-            if (req != null) {
-                req.setServletPath(path, null);
-            }
+            req.setServletPath(path, null);
             return servlet;
         }
 
@@ -570,14 +594,11 @@ public class Context implements ServletContext, InitParams
         for (PrefixPattern p : prefix_patterns_) {
             if (p.match(path)) {
                 trace("findServlet: '" + path + "' matched prefix pattern '" + p.pattern + "'");
-                if (req != null) {
-                    if (p.pattern.length() == path.length()) {
-                        log("findServlet: WARNING: it is expected '" + path + "' exactly matches " + p.pattern);
-                        req.setServletPath(p.pattern, null);
-                    } else {
-                        req.setServletPath(p.pattern,
-                                path.substring(p.pattern.length()));
-                    }
+                if (p.pattern.length() == path.length()) {
+                    log("findServlet: WARNING: it is expected '" + path + "' exactly matches " + p.pattern);
+                    req.setServletPath(p.pattern, null);
+                } else {
+                    req.setServletPath(p.pattern, path.substring(p.pattern.length()));
                 }
                 return p.servlet;
             }
@@ -595,9 +616,7 @@ public class Context implements ServletContext, InitParams
             servlet = suffix2servlet_.get(suffix);
             if (servlet != null) {
                 trace("findServlet: '" + path + "' matched suffix pattern");
-                if (req != null) {
-                    req.setServletPath(path, null);
-                }
+                req.setServletPath(path, null);
                 return servlet;
             }
         }
@@ -610,9 +629,7 @@ public class Context implements ServletContext, InitParams
          */
         if (default_servlet_ != null) {
             trace("findServlet: '" + path + "' matched default servlet");
-            if (req != null) {
-                req.setServletPath(path, null);
-            }
+            req.setServletPath(path, null);
             return default_servlet_;
         }
 
@@ -627,77 +644,51 @@ public class Context implements ServletContext, InitParams
             ...
          */
         if (path.endsWith("/")) {
+
+            /*
+                The Web server must append each welcome file in the order
+                specified in the deployment descriptor to the partial request
+                and check whether a static resource in the WAR is mapped to
+                that request URI.
+             */
             for (String wf : welcome_files_) {
                 String wpath = path + wf;
 
-                /*
-                    The Web server must append each welcome file in the order
-                    specified in the deployment descriptor to the partial
-                    request and check whether a static resource in the WAR is
-                    mapped to that request URI. If no match is found, ...
-                 */
+                File f = new File(webapp_, wpath.substring(1));
+                if (!f.exists()) {
+                    continue;
+                }
+
+                trace("findServlet: '" + path + "' found static welcome "
+                      + "file '" + wf + "'");
 
                 /*
-                    Looking for and serving static content is inconsistent
-                    with url pattern matching functionality. Tomcat, Jetty and
-                    Resin not served static files when url pattern matched.
+                    Even if static file found, we should try to find matching
+                    servlet for JSP serving etc.
                  */
-
-                /*
-                    ... the Web server MUST again append each welcome file
-                    in the order specified in the deployment descriptor to
-                    the partial request and check if a servlet is mapped
-                    to that request URI. The Web container must send the
-                    request to the first resource in the WAR that matches.
-                 */
-
-                servlet = exact2servlet_.get(wpath);
+                servlet = findWelcomeServlet(wpath, true, req);
                 if (servlet != null) {
-                    trace("findServlet: '" + wpath + "' exact matched pattern");
-                    if (req != null) {
-                        req.setServletPath(wpath, null);
-                    }
                     return servlet;
                 }
 
-                suffix_start = wpath.lastIndexOf('.');
-                if (suffix_start != -1) {
-                    String suffix = wpath.substring(suffix_start);
-                    servlet = suffix2servlet_.get(suffix);
-                    if (servlet != null) {
-                        trace("findServlet: '" + wpath + "' matched suffix pattern");
+                req.setServletPath(wpath, null);
 
-                        /*
-                            If we want to show the directory content when
-                            index.jsp is absent, then we have to check file
-                            presence here. Otherwise user will get 404.
-                         */
+                return system_default_servlet_;
+            }
 
-                        if (servlet instanceof JspServletReg) {
-                            File f = new File(webapp_, wpath.substring(1));
-                            if (!f.exists()) {
-                                trace("findServlet: '" + wpath + "' not exists");
-                                continue;
-                            }
-                        }
+            /*
+                If no match is found, the Web server MUST again append each
+                welcome file in the order specified in the deployment
+                descriptor to the partial request and check if a servlet is
+                mapped to that request URI. The Web container must send the
+                request to the first resource in the WAR that matches.
+             */
+            for (String wf : welcome_files_) {
+                String wpath = path + wf;
 
-                        if (req != null) {
-                            req.setServletPath(wpath, null);
-                        }
-                        return servlet;
-                    }
-                }
-
-                File f = new File(webapp_, wpath.substring(1));
-                if (f.exists()) {
-                    trace("findServlet: '" + path + "' found static welcome "
-                            + "file '" + wf + "' system default servlet");
-
-                    if (req != null) {
-                        req.setServletPath(wpath, null);
-                    }
-
-                    return system_default_servlet_;
+                servlet = findWelcomeServlet(wpath, false, req);
+                if (servlet != null) {
+                    return servlet;
                 }
             }
         }
@@ -709,14 +700,53 @@ public class Context implements ServletContext, InitParams
         }
 
         trace("findServlet: '" + path + "' fallback to system default servlet");
-        if (req != null) {
-            req.setServletPath(path, null);
-        }
+        req.setServletPath(path, null);
+
         return system_default_servlet_;
     }
 
+    private ServletReg findWelcomeServlet(String path, boolean exists,
+        DynamicPathRequest req)
+    {
+        ServletReg servlet = exact2servlet_.get(path);
+        if (servlet != null) {
+            trace("findWelcomeServlet: '" + path + "' exact matched pattern");
+            req.setServletPath(path, null);
+
+            return servlet;
+        }
+
+        int suffix_start = path.lastIndexOf('.');
+        if (suffix_start == -1) {
+            return null;
+        }
+
+        String suffix = path.substring(suffix_start);
+        servlet = suffix2servlet_.get(suffix);
+        if (servlet == null) {
+            return null;
+        }
+
+        trace("findWelcomeServlet: '" + path + "' matched suffix pattern");
+
+        /*
+            If we want to show the directory content when
+            index.jsp is absent, then we have to check file
+            presence here. Otherwise user will get 404.
+         */
+
+        if (servlet instanceof JspServletReg && !exists) {
+            trace("findWelcomeServlet: '" + path + "' not exists");
+            return null;
+        }
+
+        req.setServletPath(path, null);
+
+        return servlet;
+    }
+
     public void service(Request req, Response resp)
-            throws ServletException, IOException
+        throws ServletException, IOException
     {
         ClassLoader old = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(loader_);
@@ -806,7 +836,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private void handleException(Throwable e, Request req, Response resp)
-            throws ServletException, IOException
+        throws ServletException, IOException
     {
         String location;
 
@@ -817,10 +847,10 @@ public class Context implements ServletContext, InitParams
             if (location != null) {
                 trace("Exception " + e + " matched. Error page location: " + location);
 
-                req.setAttribute(RequestDispatcher.ERROR_EXCEPTION, e);
-                req.setAttribute(RequestDispatcher.ERROR_EXCEPTION_TYPE, e.getClass());
-                req.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
-                req.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, resp.SC_INTERNAL_SERVER_ERROR);
+                req.setAttribute_(RequestDispatcher.ERROR_EXCEPTION, e);
+                req.setAttribute_(RequestDispatcher.ERROR_EXCEPTION_TYPE, e.getClass());
+                req.setAttribute_(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
+                req.setAttribute_(RequestDispatcher.ERROR_STATUS_CODE, resp.SC_INTERNAL_SERVER_ERROR);
 
                 handleError(location, req, resp);
 
@@ -838,7 +868,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private void handleStatusCode(int code, Request req, Response resp)
-            throws ServletException, IOException
+        throws ServletException, IOException
     {
         String location;
 
@@ -847,14 +877,14 @@ public class Context implements ServletContext, InitParams
         if (location != null) {
             trace("Status " + code + " matched. Error page location: " + location);
 
-            req.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
+            req.setAttribute_(RequestDispatcher.ERROR_REQUEST_URI, req.getRequestURI());
 
             handleError(location, req, resp);
         }
     }
 
     public void handleError(String location, Request req, Response resp)
-            throws ServletException, IOException
+        throws ServletException, IOException
     {
         try {
             log("handleError: " + location);
@@ -917,7 +947,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private void processWebXml(InputStream is)
-            throws ParserConfigurationException, SAXException, IOException
+        throws ParserConfigurationException, SAXException, IOException
     {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
@@ -993,7 +1023,7 @@ public class Context implements ServletContext, InitParams
 
                 if (tag_name.equals("async-supported")) {
                     reg.setAsyncSupported(child_node.getTextContent().trim()
-                            .equals("true"));
+                        .equals("true"));
                     continue;
                 }
 
@@ -1080,7 +1110,7 @@ public class Context implements ServletContext, InitParams
 
                 if (tag_name.equals("async-supported")) {
                     reg.setAsyncSupported(child_node.getTextContent().trim()
-                            .equals("true"));
+                        .equals("true"));
                     continue;
                 }
 
@@ -1244,7 +1274,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private void processXmlInitParam(InitParams params, Element elem)
-            throws RuntimeException
+          throws RuntimeException
     {
         NodeList n = elem.getElementsByTagName("param-name");
         if (n == null || n.getLength() != 1) {
@@ -1256,7 +1286,7 @@ public class Context implements ServletContext, InitParams
             throw new RuntimeException("Invalid web.xml: 'param-value' tag not found");
         }
         params.setInitParameter(n.item(0).getTextContent().trim(),
-                v.item(0).getTextContent().trim());
+            v.item(0).getTextContent().trim());
     }
 
     private void loadInitializers(ScanResult scan_res)
@@ -1264,7 +1294,7 @@ public class Context implements ServletContext, InitParams
         trace("load initializer(s)");
 
         ServiceLoader<ServletContainerInitializer> initializers =
-                ServiceLoader.load(ServletContainerInitializer.class, loader_);
+            ServiceLoader.load(ServletContainerInitializer.class, loader_);
 
         for (ServletContainerInitializer sci : initializers) {
 
@@ -1288,13 +1318,13 @@ public class Context implements ServletContext, InitParams
                 trace("loadInitializers: find handles: " + c.getName());
 
                 ClassInfoList handles = c.isInterface()
-                        ? scan_res.getClassesImplementing(c.getName())
-                        : scan_res.getSubclasses(c.getName());
+                    ? scan_res.getClassesImplementing(c.getName())
+                    : scan_res.getSubclasses(c.getName());
 
                 for (ClassInfo ci : handles) {
                     if (ci.isInterface()
-                            || ci.isAnnotation()
-                            || ci.isAbstract())
+                        || ci.isAnnotation()
+                        || ci.isAbstract())
                     {
                         continue;
                     }
@@ -1319,15 +1349,15 @@ public class Context implements ServletContext, InitParams
     }
 
     private void scanClasses(ScanResult scan_res)
-            throws ReflectiveOperationException
+        throws ReflectiveOperationException
     {
         ClassInfoList filters = scan_res.getClassesWithAnnotation(WebFilter.class.getName());
 
         for (ClassInfo ci : filters) {
             if (ci.isInterface()
-                    || ci.isAnnotation()
-                    || ci.isAbstract()
-                    || !ci.implementsInterface(Filter.class.getName()))
+                || ci.isAnnotation()
+                || ci.isAbstract()
+                || !ci.implementsInterface(Filter.class.getName()))
             {
                 trace("scanClasses: ignoring Filter impl: " + ci.getName());
                 continue;
@@ -1391,9 +1421,9 @@ public class Context implements ServletContext, InitParams
 
         for (ClassInfo ci : servlets) {
             if (ci.isInterface()
-                    || ci.isAnnotation()
-                    || ci.isAbstract()
-                    || !ci.extendsSuperclass(HttpServlet.class.getName()))
+                || ci.isAnnotation()
+                || ci.isAbstract()
+                || !ci.extendsSuperclass(HttpServlet.class.getName()))
             {
                 trace("scanClasses: ignoring HttpServlet subclass: " + ci.getName());
                 continue;
@@ -1445,8 +1475,8 @@ public class Context implements ServletContext, InitParams
 
         for (ClassInfo ci : lstnrs) {
             if (ci.isInterface()
-                    || ci.isAnnotation()
-                    || ci.isAbstract())
+                || ci.isAnnotation()
+                || ci.isAbstract())
             {
                 trace("scanClasses: listener impl: " + ci.getName());
                 continue;
@@ -1521,28 +1551,28 @@ public class Context implements ServletContext, InitParams
     private void removeDir(File dir) throws IOException
     {
         Files.walkFileTree(dir.toPath(),
-                new SimpleFileVisitor<Path>() {
-                    @Override
-                    public FileVisitResult postVisitDirectory(
-                            Path dir, IOException exc) throws IOException {
-                        Files.delete(dir);
-                        return FileVisitResult.CONTINUE;
-                    }
+            new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult postVisitDirectory(
+                  Path dir, IOException exc) throws IOException {
+                    Files.delete(dir);
+                    return FileVisitResult.CONTINUE;
+                }
 
-                    @Override
-                    public FileVisitResult visitFile(
-                            Path file, BasicFileAttributes attrs)
-                            throws IOException {
-                        Files.delete(file);
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
+                @Override
+                public FileVisitResult visitFile(
+                  Path file, BasicFileAttributes attrs) 
+                  throws IOException {
+                    Files.delete(file);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
     }
 
     private class CtxInitParams implements InitParams
     {
         private final Map<String, String> init_params_ =
-                new HashMap<String, String>();
+            new HashMap<String, String>();
 
         public boolean setInitParameter(String name, String value)
         {
@@ -1603,7 +1633,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private class NamedReg extends CtxInitParams
-            implements Registration
+        implements Registration
     {
         private final String name_;
         private String class_name_;
@@ -1638,7 +1668,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private class ServletReg extends NamedReg
-            implements ServletRegistration.Dynamic, ServletConfig
+        implements ServletRegistration.Dynamic, ServletConfig
     {
         private Class<?> servlet_class_;
         private Servlet servlet_;
@@ -1715,8 +1745,8 @@ public class Context implements ServletContext, InitParams
         public void setClassName(String class_name) throws IllegalStateException
         {
             if (servlet_ != null
-                    || servlet_class_ != null
-                    || getClassName() != null)
+                || servlet_class_ != null
+                || getClassName() != null)
             {
                 throw new IllegalStateException("Class already initialized");
             }
@@ -1725,11 +1755,11 @@ public class Context implements ServletContext, InitParams
         }
 
         public void setClass(Class<?> servlet_class)
-                throws IllegalStateException
+            throws IllegalStateException
         {
             if (servlet_ != null
-                    || servlet_class_ != null
-                    || getClassName() != null)
+                || servlet_class_ != null
+                || getClassName() != null)
             {
                 throw new IllegalStateException("Class already initialized");
             }
@@ -1739,7 +1769,7 @@ public class Context implements ServletContext, InitParams
         }
 
         public void service(ServletRequest request, ServletResponse response)
-                throws ServletException, IOException
+            throws ServletException, IOException
         {
             init();
 
@@ -1813,7 +1843,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void setMultipartConfig(
-                MultipartConfigElement multipartConfig)
+            MultipartConfigElement multipartConfig)
         {
             log("ServletReg.setMultipartConfig");
         }
@@ -1854,7 +1884,7 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void service(ServletRequest request, ServletResponse response)
-                throws ServletException, IOException
+            throws ServletException, IOException
         {
             ClassLoader old = Thread.currentThread().getContextClassLoader();
             Thread.currentThread().setContextClassLoader(jsp_loader_);
@@ -1875,33 +1905,33 @@ public class Context implements ServletContext, InitParams
     }
 
     public void parseURLPattern(String p, ServletReg servlet)
-            throws IllegalArgumentException
+        throws IllegalArgumentException
     {
         URLPattern pattern = parseURLPattern(p);
 
         switch (pattern.type_) {
-            case PREFIX:
-                prefix_patterns_.add(new PrefixPattern(pattern.pattern_, servlet));
-                return;
+        case PREFIX:
+            prefix_patterns_.add(new PrefixPattern(pattern.pattern_, servlet));
+            return;
 
-            case SUFFIX:
-                suffix2servlet_.put(pattern.pattern_, servlet);
-                return;
+        case SUFFIX:
+            suffix2servlet_.put(pattern.pattern_, servlet);
+            return;
 
-            case EXACT:
-                exact2servlet_.put(pattern.pattern_, servlet);
-                return;
+        case EXACT:
+            exact2servlet_.put(pattern.pattern_, servlet);
+            return;
 
-            case DEFAULT:
-                default_servlet_ = servlet;
-                return;
+        case DEFAULT:
+            default_servlet_ = servlet;
+            return;
         }
 
         /* TODO process other cases, throw IllegalArgumentException */
     }
 
     public URLPattern parseURLPattern(String p)
-            throws IllegalArgumentException
+        throws IllegalArgumentException
     {
         URLPattern pattern = parsed_patterns_.get(p);
         if (pattern == null) {
@@ -1925,7 +1955,7 @@ public class Context implements ServletContext, InitParams
         private final URLPatternType type_;
 
         public URLPattern(String p)
-                throws IllegalArgumentException
+            throws IllegalArgumentException
         {
             /*
                 12.2 Specification of Mappings
@@ -1989,19 +2019,19 @@ public class Context implements ServletContext, InitParams
         public boolean match(String url)
         {
             switch (type_) {
-                case PREFIX:
-                    return url.startsWith(pattern_) && (
-                            url.length() == pattern_.length()
-                                    || url.charAt(pattern_.length()) == '/');
+            case PREFIX:
+                return url.startsWith(pattern_) && (
+                    url.length() == pattern_.length()
+                    || url.charAt(pattern_.length()) == '/');
 
-                case SUFFIX:
-                    return url.endsWith(pattern_);
+            case SUFFIX:
+                return url.endsWith(pattern_);
 
-                case EXACT:
-                    return url.equals(pattern_);
+            case EXACT:
+                return url.equals(pattern_);
 
-                case DEFAULT:
-                    return true;
+            case DEFAULT:
+                return true;
             }
 
             return false;
@@ -2009,7 +2039,7 @@ public class Context implements ServletContext, InitParams
     }
 
     private class FilterReg extends NamedReg
-            implements FilterRegistration.Dynamic, FilterConfig
+        implements FilterRegistration.Dynamic, FilterConfig
     {
         private Class<?> filter_class_;
         private Filter filter_;
@@ -2041,8 +2071,8 @@ public class Context implements ServletContext, InitParams
         public void setClassName(String class_name) throws IllegalStateException
         {
             if (filter_ != null
-                    || filter_class_ != null
-                    || getClassName() != null)
+                || filter_class_ != null
+                || getClassName() != null)
             {
                 throw new IllegalStateException("Class already initialized");
             }
@@ -2053,8 +2083,8 @@ public class Context implements ServletContext, InitParams
         public void setClass(Class<?> filter_class) throws IllegalStateException
         {
             if (filter_ != null
-                    || filter_class_ != null
-                    || getClassName() != null)
+                || filter_class_ != null
+                || getClassName() != null)
             {
                 throw new IllegalStateException("Class already initialized");
             }
@@ -2093,8 +2123,8 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void addMappingForServletNames(
-                EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
-                String... servletNames)
+            EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
+            String... servletNames)
         {
             checkContextState();
 
@@ -2109,7 +2139,7 @@ public class Context implements ServletContext, InitParams
                 }
 
                 FilterMap map = new FilterMap(this, sreg, dispatcherTypes,
-                        isMatchAfter);
+                    isMatchAfter);
 
                 sreg.addFilter(map);
             }
@@ -2126,8 +2156,8 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void addMappingForUrlPatterns(
-                EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
-                String... urlPatterns)
+            EnumSet<DispatcherType> dispatcherTypes, boolean isMatchAfter,
+            String... urlPatterns)
         {
             checkContextState();
 
@@ -2136,7 +2166,7 @@ public class Context implements ServletContext, InitParams
 
                 URLPattern p = parseURLPattern(u);
                 FilterMap map = new FilterMap(this, p, dispatcherTypes,
-                        isMatchAfter);
+                    isMatchAfter);
 
                 filter_maps_.add(map);
             }
@@ -2178,7 +2208,7 @@ public class Context implements ServletContext, InitParams
         private final boolean match_after_;
 
         public FilterMap(FilterReg filter, ServletReg servlet,
-                         EnumSet<DispatcherType> dtypes, boolean match_after)
+            EnumSet<DispatcherType> dtypes, boolean match_after)
         {
             filter_ = filter;
             servlet_ = servlet;
@@ -2188,7 +2218,7 @@ public class Context implements ServletContext, InitParams
         }
 
         public FilterMap(FilterReg filter, URLPattern pattern,
-                         EnumSet<DispatcherType> dtypes, boolean match_after)
+            EnumSet<DispatcherType> dtypes, boolean match_after)
         {
             filter_ = filter;
             servlet_ = null;
@@ -2280,84 +2310,143 @@ public class Context implements ServletContext, InitParams
         return SERVLET_MINOR_VERSION;
     }
 
-    private class CtxRequestDispatcher implements RequestDispatcher
+    private class URIRequestDispatcher implements RequestDispatcher
     {
-        private String uri_;
+        private final URI uri_;
 
-        public CtxRequestDispatcher(String uri)
+        public URIRequestDispatcher(URI uri)
         {
             uri_ = uri;
         }
 
+        public URIRequestDispatcher(String uri)
+            throws URISyntaxException
+        {
+            uri_ = new URI(uri);
+        }
+
         @Override
         public void forward(ServletRequest request, ServletResponse response)
-                throws ServletException, IOException
+            throws ServletException, IOException
         {
+            /*
+                9.4 The Forward Method
+                ...
+                If the response has been committed, an IllegalStateException
+                must be thrown.
+             */
+            if (response.isCommitted()) {
+                throw new IllegalStateException("Response already committed");
+            }
+
+            ForwardRequestWrapper req = new ForwardRequestWrapper(request);
+
             try {
-                trace("CtxRequestDispatcher.forward");
-                Request r = (Request) request;
+                trace("URIRequestDispatcher.forward");
 
-                String servlet_path = r.getServletPath();
-                String path_info = r.getPathInfo();
-                String req_uri = r.getRequestURI();
-                DispatcherType dtype = r.getDispatcherType();
-
-                URI uri = new URI(req_uri);
-                uri = uri.resolve(uri_);
-
-                r.setRequestURI(uri.getRawPath());
-                r.setDispatcherType(DispatcherType.FORWARD);
-
-                ServletReg servlet = findServlet(uri.getPath(), r);
+                ServletReg servlet = findServlet(uri_.getPath(), req);
 
                 if (servlet == null) {
-                    Response resp = (Response) response;
+                    HttpServletResponse resp = (HttpServletResponse) response;
                     resp.sendError(HttpServletResponse.SC_NOT_FOUND);
 
-                } else {
-                    servlet.service(r, response);
+                    return;
                 }
 
-                r.setServletPath(servlet_path, path_info);
-                r.setRequestURI(req_uri);
-                r.setDispatcherType(dtype);
+                req.setRequestURI(uri_.getRawPath());
+                req.setQueryString(uri_.getRawQuery());
+                req.setDispatcherType(DispatcherType.FORWARD);
 
-                trace("CtxRequestDispatcher.forward done");
-            } catch (URISyntaxException e) {
+                /*
+                    9.4 The Forward Method
+                    ...
+                    If output data exists in the response buffer that has not
+                    been committed, the content must be cleared before the
+                    target servlet’s service method is called.
+                 */
+                response.resetBuffer();
+
+                servlet.service(request, response);
+
+                /*
+                    9.4 The Forward Method
+                    ...
+                    Before the forward method of the RequestDispatcher interface
+                    returns without exception, the response content must be sent
+                    and committed, and closed by the servlet container, unless
+                    the request was put into the asynchronous mode. If an error
+                    occurs in the target of the RequestDispatcher.forward() the
+                    exception may be propagated back through all the calling
+                    filters and servlets and eventually back to the container
+                 */
+                if (!request.isAsyncStarted()) {
+                    response.flushBuffer();
+                }
+
+            /*
+                9.5 Error Handling
+
+                If the servlet that is the target of a request dispatcher
+                throws a runtime exception or a checked exception of type
+                ServletException or IOException, it should be propagated
+                to the calling servlet. All other exceptions should be
+                wrapped as ServletExceptions and the root cause of the
+                exception set to the original exception, as it should
+                not be propagated.
+             */
+            } catch (ServletException e) {
+                throw e;
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
                 throw new ServletException(e);
+            } finally {
+                req.close();
+
+                trace("URIRequestDispatcher.forward done");
             }
         }
 
         @Override
         public void include(ServletRequest request, ServletResponse response)
-                throws ServletException, IOException
+            throws ServletException, IOException
         {
+            IncludeRequestWrapper req = new IncludeRequestWrapper(request);
+
             try {
-                trace("CtxRequestDispatcher.include");
-                Request r = (Request) request;
+                trace("URIRequestDispatcher.include");
 
-                DispatcherType dtype = request.getDispatcherType();
-
-                r.setDispatcherType(DispatcherType.INCLUDE);
-
-                URI uri = new URI(r.getRequestURI());
-                uri = uri.resolve(uri_);
-
-                ServletReg servlet = findServlet(uri.getPath());
+                ServletReg servlet = findServlet(uri_.getPath(), req);
 
                 if (servlet == null) {
-                    Response resp = (Response) response;
-                    resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+                    /*
+                        9.3 The Include Method
+                        ...
+                        If the default servlet is the target of a
+                        RequestDispatch.include() and the requested resource
+                        does not exist, then the default servlet MUST throw
+                        FileNotFoundException.
+                     */
 
-                } else {
-                    servlet.service(r, response);
+                    throw new FileNotFoundException();
                 }
 
-                r.setDispatcherType(dtype);
+                req.setRequestURI(uri_.getRawPath());
+                req.setQueryString(uri_.getRawQuery());
+                req.setDispatcherType(DispatcherType.INCLUDE);
 
-                trace("CtxRequestDispatcher.include done");
-            } catch (URISyntaxException e) {
+                servlet.service(request, response);
+
+            } catch (ServletException e) {
+                throw e;
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
                 throw new ServletException(e);
+            } finally {
+                req.close();
+
+                trace("URIRequestDispatcher.include done");
             }
         }
     }
@@ -2373,38 +2462,113 @@ public class Context implements ServletContext, InitParams
 
         @Override
         public void forward(ServletRequest request, ServletResponse response)
-                throws ServletException, IOException
+            throws ServletException, IOException
         {
+            /*
+                9.4 The Forward Method
+                ...
+                If the response has been committed, an IllegalStateException
+                must be thrown.
+             */
+            if (response.isCommitted()) {
+                throw new IllegalStateException("Response already committed");
+            }
+
             trace("ServletDispatcher.forward");
-            Request r = (Request) request;
 
-            DispatcherType dtype = r.getDispatcherType();
+            DispatcherType dtype = request.getDispatcherType();
 
-            r.setDispatcherType(DispatcherType.FORWARD);
+            Request req;
+            if (request instanceof Request) {
+                req = (Request) request;
+            } else {
+                req = (Request) request.getAttribute(Request.BARE);
+            }
 
-            servlet_.service(r, response);
+            try {
+                req.setDispatcherType(DispatcherType.FORWARD);
 
-            r.setDispatcherType(dtype);
+                /*
+                    9.4 The Forward Method
+                    ...
+                    If output data exists in the response buffer that has not
+                    been committed, the content must be cleared before the
+                    target servlet’s service method is called.
+                 */
+                response.resetBuffer();
 
-            trace("ServletDispatcher.forward done");
+                servlet_.service(request, response);
+
+                /*
+                    9.4 The Forward Method
+                    ...
+                    Before the forward method of the RequestDispatcher interface
+                    returns without exception, the response content must be sent
+                    and committed, and closed by the servlet container, unless
+                    the request was put into the asynchronous mode. If an error
+                    occurs in the target of the RequestDispatcher.forward() the
+                    exception may be propagated back through all the calling
+                    filters and servlets and eventually back to the container
+                 */
+                if (!request.isAsyncStarted()) {
+                    response.flushBuffer();
+                }
+
+            /*
+                9.5 Error Handling
+
+                If the servlet that is the target of a request dispatcher
+                throws a runtime exception or a checked exception of type
+                ServletException or IOException, it should be propagated
+                to the calling servlet. All other exceptions should be
+                wrapped as ServletExceptions and the root cause of the
+                exception set to the original exception, as it should
+                not be propagated.
+             */
+            } catch (ServletException e) {
+                throw e;
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ServletException(e);
+            } finally {
+                req.setDispatcherType(dtype);
+
+                trace("ServletDispatcher.forward done");
+            }
         }
 
         @Override
         public void include(ServletRequest request, ServletResponse response)
-                throws ServletException, IOException
+            throws ServletException, IOException
         {
             trace("ServletDispatcher.include");
-            Request r = (Request) request;
 
             DispatcherType dtype = request.getDispatcherType();
 
-            r.setDispatcherType(DispatcherType.INCLUDE);
+            Request req;
+            if (request instanceof Request) {
+                req = (Request) request;
+            } else {
+                req = (Request) request.getAttribute(Request.BARE);
+            }
 
-            servlet_.service(r, response);
+            try {
+                req.setDispatcherType(DispatcherType.INCLUDE);
 
-            r.setDispatcherType(dtype);
+                servlet_.service(request, response);
 
-            trace("ServletDispatcher.include done");
+            } catch (ServletException e) {
+                throw e;
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ServletException(e);
+            } finally {
+                req.setDispatcherType(dtype);
+
+                trace("ServletDispatcher.include done");
+            }
         }
     }
 
@@ -2425,7 +2589,19 @@ public class Context implements ServletContext, InitParams
     public RequestDispatcher getRequestDispatcher(String uriInContext)
     {
         trace("getRequestDispatcher for " + uriInContext);
-        return new CtxRequestDispatcher(uriInContext);
+        try {
+            return new URIRequestDispatcher(context_path_ + uriInContext);
+        } catch (URISyntaxException e) {
+            log("getRequestDispatcher: failed to create dispatcher: " + e);
+        }
+
+        return null;
+    }
+
+    public RequestDispatcher getRequestDispatcher(URI uri)
+    {
+        trace("getRequestDispatcher for " + uri.getRawPath());
+        return new URIRequestDispatcher(uri);
     }
 
     @Override
@@ -2435,11 +2611,7 @@ public class Context implements ServletContext, InitParams
 
         File f = new File(webapp_, path.substring(1));
 
-        if (f.exists()) {
-            return f.getAbsolutePath();
-        }
-
-        return null;
+        return f.getAbsolutePath();
     }
 
     @Override
@@ -2630,7 +2802,7 @@ public class Context implements ServletContext, InitParams
         }
 
         ServletContextAttributeEvent scae = new ServletContextAttributeEvent(
-                this, name, prev == null ? object : prev);
+            this, name, prev == null ? object : prev);
 
         for (ServletContextAttributeListener l : ctx_attr_listeners_) {
             if (prev == null) {
@@ -2653,7 +2825,7 @@ public class Context implements ServletContext, InitParams
         }
 
         ServletContextAttributeEvent scae = new ServletContextAttributeEvent(
-                this, name, value);
+            this, name, value);
 
         for (ServletContextAttributeListener l : ctx_attr_listeners_) {
             l.attributeRemoved(scae);
@@ -2662,7 +2834,7 @@ public class Context implements ServletContext, InitParams
 
     @Override
     public FilterRegistration.Dynamic addFilter(String name,
-                                                Class<? extends Filter> filterClass)
+        Class<? extends Filter> filterClass)
     {
         log("addFilter<C> " + name + ", " + filterClass.getName());
 
@@ -2702,7 +2874,7 @@ public class Context implements ServletContext, InitParams
 
     @Override
     public ServletRegistration.Dynamic addServlet(String name,
-                                                  Class<? extends Servlet> servletClass)
+        Class<? extends Servlet> servletClass)
     {
         log("addServlet<C> " + name + ", " + servletClass.getName());
 
@@ -3051,7 +3223,7 @@ public class Context implements ServletContext, InitParams
 
     @Override
     public <T extends EventListener> T createListener(Class<T> clazz)
-            throws ServletException
+        throws ServletException
     {
         log("createListener<C> " + clazz.getName());
 
