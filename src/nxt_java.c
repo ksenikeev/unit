@@ -129,11 +129,12 @@ static nxt_int_t
 nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 {
     jint                 rc;
-    char                 *opt, **classpath_arr, **unit_jars, **system_jars, **jsp_jars;
+    char                 *opt, *real_path;
+    char                 **classpath_arr, **unit_jars, **system_jars, **jsp_jars;
     JavaVM               *jvm;
     JNIEnv               *env;
     nxt_str_t            str;
-    nxt_int_t            opt_len;
+    nxt_int_t            opt_len, real_path_len;
     nxt_uint_t           i, unit_jars_count, classpath_count, system_jars_count, jsp_jars_count;
     JavaVMOption         *jvm_opt;
     JavaVMInitArgs       jvm_args;
@@ -233,7 +234,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
             opt_len = str.length + 1;
 
             char *sc = memchr(str.start, ':', str.length);
-            if (sc == NULL) {
+            if (sc == NULL && str.start[0] == '/') {
                 opt_len += nxt_length("file:");
             }
 
@@ -243,13 +244,40 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
                 return NXT_ERROR;
             }
 
+            if (sc == NULL && str.start[0] != '/') {
+                nxt_memcpy(opt, str.start, str.length);
+                opt[str.length] = '\0';
+
+                real_path = realpath(opt, NULL);
+                if (real_path == NULL) {
+                    nxt_alert(task, "failed to allocate realpath classpath");
+                    return NXT_ERROR;
+                }
+
+                real_path_len = nxt_strlen(real_path);
+
+                free(opt);
+
+                opt_len = nxt_length("file:") + real_path_len + 1;
+
+                opt = nxt_malloc(opt_len);
+                if (opt == NULL) {
+                    nxt_alert(task, "failed to allocate classpath");
+                    return NXT_ERROR;
+                }
+
+            } else {
+                real_path = (char *) str.start;  /* I love this cast! */
+                real_path_len = str.length;
+            }
+
             classpath_arr[i] = opt;
 
             if (sc == NULL) {
                 opt = nxt_cpymem(opt, "file:", nxt_length("file:"));
             }
 
-            opt = nxt_cpymem(opt, str.start, str.length);
+            opt = nxt_cpymem(opt, real_path, real_path_len);
             *opt = '\0';
         }
 
