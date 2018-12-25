@@ -384,7 +384,7 @@ public class Context implements ServletContext, InitParams
 
         processWebXml(root);
 
-        loader_ = new CtxClassLoader(urls,
+        loader_ = new AppClassLoader(urls,
             Context.class.getClassLoader().getParent());
 
         ClassLoader old = Thread.currentThread().getContextClassLoader();
@@ -467,44 +467,130 @@ public class Context implements ServletContext, InitParams
         }
     }
 
-    private class CtxClassLoader extends URLClassLoader
+    private static class AppClassLoader extends URLClassLoader
     {
-        public CtxClassLoader(URL[] urls, ClassLoader parent)
+        static {
+            ClassLoader.registerAsParallelCapable();
+        }
+
+        private final static String[] system_prefix =
+        {
+            "java/",     // Java SE classes (per servlet spec v2.5 / SRV.9.7.2)
+            "javax/",    // Java SE classes (per servlet spec v2.5 / SRV.9.7.2)
+            "org/w3c/",  // needed by javax.xml
+            "org/xml/",  // needed by javax.xml
+        };
+
+        private ClassLoader system_loader;
+
+        public AppClassLoader(URL[] urls, ClassLoader parent)
         {
             super(urls, parent);
+
+            ClassLoader j = String.class.getClassLoader();
+            if (j == null) {
+                j = getSystemClassLoader();
+                while (j.getParent() != null) {
+                    j = j.getParent();
+                }
+            }
+            system_loader = j; 
+        }
+
+        private boolean isSystemPath(String path)
+        {
+            int i = Arrays.binarySearch(system_prefix, path);
+
+            if (i >= 0) {
+                return true;
+            }
+
+            i = -i - 1;
+
+            if (i > 0) {
+                return path.startsWith(system_prefix[i - 1]);
+            }
+
+            return false;
+        }
+
+        @Override
+        public URL getResource(String name)
+        {
+            URL res;
+
+            String s = "getResource: " + name;
+            trace(0, s, s.length());
+
+            /*
+                This is a required for compatibility with Tomcat which
+                stores all resources prefixed with '/' and application code
+                may try to get resource with leading '/' (like Jira). Jetty
+                also has such workaround in WebAppClassLoader.getResource().
+             */
+            if (name.startsWith("/")) {
+                name = name.substring(1);
+            }
+
+            if (isSystemPath(name)) {
+                return super.getResource(name);
+            }
+
+            res = system_loader.getResource(name);
+            if (res != null) {
+                return res;
+            }
+
+            res = findResource(name);
+            if (res != null) {
+                return res;
+            }
+
+            return super.getResource(name);
         }
 
         @Override
         protected Class<?> loadClass(String name, boolean resolve)
             throws ClassNotFoundException
         {
-            // trace("Loader.loadClass: " + name + "; " + resolve);
+            synchronized (this) {
+                Class<?> res = findLoadedClass(name);
+                if (res != null) {
+                    return res;
+                }
 
-            // Has this loader loaded the class already?
-            Class<?> webapp_class = findLoadedClass(name);
-            if (webapp_class != null) {
-                //trace("found " + name + " loaded");
-                return webapp_class;
-            }
+                try {
+                    res = system_loader.loadClass(name);
 
-            if (name.startsWith("java.") || name.startsWith("javax.")) {
+                    if (resolve) {
+                        resolveClass(res);
+                    }
+
+                    return res;
+                } catch (ClassNotFoundException e) {
+                }
+
+                String path = name.replace('.', '/').concat(".class");
+
+                if (isSystemPath(path)) {
+                    return super.loadClass(name, resolve);
+                }
+
+                URL url = findResource(path);
+
+                if (url != null) {
+                    res = super.findClass(name);
+
+                    if (resolve) {
+                        resolveClass(res);
+                    }
+
+                    return res;
+                }
+
                 return super.loadClass(name, resolve);
             }
 
-            // Try the webapp classloader first
-            // Look in the webapp classloader as a resource, to avoid 
-            // loading a system class.
-            String path = name.replace('.', '/').concat(".class");
-            URL webapp_url = findResource(path);
-
-            if (webapp_url != null) {
-                webapp_class = super.findClass(name); //,webapp_url);
-                resolveClass(webapp_class);
-                //trace("webapp loaded " + name);
-                return webapp_class;
-            }
-
-            return super.loadClass(name, resolve);
         }
     }
 
