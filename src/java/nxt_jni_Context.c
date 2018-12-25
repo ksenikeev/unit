@@ -39,7 +39,7 @@ nxt_java_initContext(JNIEnv *env, jobject cl)
     cls = nxt_java_Context_class;
 
     nxt_java_Context_start = (*env)->GetStaticMethodID(env, cls, "start",
-                     "(Ljava/lang/String;[Ljava/net/URL;[Ljava/net/URL;)Lnginx/unit/Context;");
+                     "(Ljava/lang/String;[Ljava/net/URL;)Lnginx/unit/Context;");
     if (nxt_java_Context_start == NULL) {
         nxt_unit_warn(NULL, "nginx.unit.Context.start() not found");
         goto failed;
@@ -89,8 +89,7 @@ failed:
 }
 
 jobject
-nxt_java_startContext(JNIEnv *env, const char *webapp, jobject classpaths,
-                      jobject jsps)
+nxt_java_startContext(JNIEnv *env, const char *webapp, jobject classpaths)
 {
     jstring webapp_str = (*env)->NewStringUTF(env, webapp);
     if (webapp_str == NULL) {
@@ -99,7 +98,7 @@ nxt_java_startContext(JNIEnv *env, const char *webapp, jobject classpaths,
 
     return (*env)->CallStaticObjectMethod(env, nxt_java_Context_class,
                                           nxt_java_Context_start, webapp_str,
-                                          classpaths, jsps);
+                                          classpaths);
 }
 
 void

@@ -233,6 +233,29 @@ NXT_JAR_NAME=tomcat-el-api
 NXT_JAR_NAME=tomcat-jsp-api
 . auto/modules/java_get_jar
 
+NXT_JAR_NAME=tomcat-jasper
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=tomcat-jasper-el
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=tomcat-juli
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=tomcat-api
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=tomcat-util-scan
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=tomcat-util
+. auto/modules/java_get_jar
+
+NXT_JAR_NAME=ecj
+NXT_JAR_VERSION=3.13.102
+NXT_JAR_NAMESPACE=org/eclipse/jdt/
+. auto/modules/java_get_jar
+
 cat << END >> $NXT_JAVA_JARS
     NULL
 };
@@ -256,39 +279,6 @@ NXT_JAR_NAME=jetty-http
 NXT_JAR_NAME=classgraph
 NXT_JAR_VERSION=4.4.11
 NXT_JAR_NAMESPACE=io/github/classgraph/
-. auto/modules/java_get_jar
-
-cat << END >> $NXT_JAVA_JARS
-    NULL
-};
-
-static const char *nxt_java_jsp_jars[] = {
-END
-
-NXT_JAR_VERSION=$NXT_TOMCAT_VERSION
-
-NXT_JAR_NAME=tomcat-jasper
-NXT_JAR_NAMESPACE=org/apache/tomcat/
-. auto/modules/java_get_jar
-
-NXT_JAR_NAME=tomcat-jasper-el
-. auto/modules/java_get_jar
-
-NXT_JAR_NAME=tomcat-juli
-. auto/modules/java_get_jar
-
-NXT_JAR_NAME=tomcat-api
-. auto/modules/java_get_jar
-
-NXT_JAR_NAME=tomcat-util-scan
-. auto/modules/java_get_jar
-
-NXT_JAR_NAME=tomcat-util
-. auto/modules/java_get_jar
-
-NXT_JAR_NAME=ecj
-NXT_JAR_VERSION=3.13.102
-NXT_JAR_NAMESPACE=org/eclipse/jdt/
 . auto/modules/java_get_jar
 
 cat << END >> $NXT_JAVA_JARS

@@ -109,14 +109,14 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import org.apache.jasper.servlet.JspServlet;
+import org.apache.jasper.servlet.JasperInitializer;
+
 
 public class Context implements ServletContext, InitParams
 {
     public final static int SERVLET_MAJOR_VERSION = 3;
     public final static int SERVLET_MINOR_VERSION = 1;
-
-    private final static String JSP_SERVLET = "org.apache.jasper.servlet.JspServlet";
-    private final static String JASPER_INITIALIZER = "org.apache.jasper.servlet.JasperInitializer";
 
     private String context_path_ = "";
     private String server_info_ = "unit";
@@ -127,7 +127,6 @@ public class Context implements ServletContext, InitParams
     private boolean ctx_initialized_ = false;
 
     private ClassLoader loader_;
-    private ClassLoader jsp_loader_;
     private File webapp_;
     private File extracted_dir_;
     private File temp_dir_;
@@ -319,12 +318,12 @@ public class Context implements ServletContext, InitParams
         }
     }
 
-    public static Context start(String webapp, URL[] classpaths, URL[] jsps)
+    public static Context start(String webapp, URL[] classpaths)
         throws Exception
     {
         Context ctx = new Context();
 
-        ctx.loadApp(webapp, classpaths, jsps);
+        ctx.loadApp(webapp, classpaths);
         ctx.initialized();
 
         return ctx;
@@ -335,7 +334,7 @@ public class Context implements ServletContext, InitParams
         default_session_tracking_modes_.add(SessionTrackingMode.COOKIE);
     }
 
-    public void loadApp(String webapp, URL[] classpaths, URL[] jsps)
+    public void loadApp(String webapp, URL[] classpaths)
         throws Exception
     {
         File root = new File(webapp);
@@ -429,15 +428,6 @@ public class Context implements ServletContext, InitParams
             }
 
             if (pattern2servlet_.get("*.jsp") == null) {
-                jsp_loader_ = new URLClassLoader(jsps, loader_);
-
-                trace("startup JasperInitializer");
-
-                Class<?> ji_cls = jsp_loader_.loadClass(JASPER_INITIALIZER);
-                Constructor<?> ji_ctor = ji_cls.getConstructor();
-                ServletContainerInitializer ji = (ServletContainerInitializer) ji_ctor.newInstance();
-                ji.onStartup(Collections.emptySet(), this);
-
                 ServletReg jsp_servlet = new JspServletReg();
                 servlets_.add(jsp_servlet);
 
@@ -1802,7 +1792,18 @@ public class Context implements ServletContext, InitParams
                 return;
             }
 
+            init_servlet();
+
+            servlet_.init((ServletConfig) this);
+
+            initialized_ = true;
+        }
+
+        protected void init_servlet() throws ServletException
+        {
             if (servlet_ == null) {
+                trace("ServletReg.init(): " + getName());
+
                 try {
                     if (servlet_class_ == null) {
                         servlet_class_ = loader_.loadClass(getClassName());
@@ -1815,10 +1816,6 @@ public class Context implements ServletContext, InitParams
                     throw new ServletException(e);
                 }
             }
-
-            servlet_.init((ServletConfig) this);
-
-            initialized_ = true;
         }
 
         public void startup() throws ServletException
@@ -1974,21 +1971,17 @@ public class Context implements ServletContext, InitParams
     {
         public JspServletReg() throws ClassNotFoundException
         {
-            super("jsp", jsp_loader_.loadClass(JSP_SERVLET));
+            super("jsp", JspServlet.class);
         }
 
         @Override
-        public void service(ServletRequest request, ServletResponse response)
-            throws ServletException, IOException
+        protected void init_servlet() throws ServletException
         {
-            ClassLoader old = Thread.currentThread().getContextClassLoader();
-            Thread.currentThread().setContextClassLoader(jsp_loader_);
+            JasperInitializer ji = new JasperInitializer();
 
-            try {
-                super.service(request, response);
-            } finally {
-                Thread.currentThread().setContextClassLoader(old);
-            }
+            ji.onStartup(Collections.emptySet(), Context.this);
+
+            super.init_servlet();
         }
     }
 
