@@ -556,13 +556,62 @@ nxt_java_Request_getScheme(JNIEnv *env, jclass cls, jlong req_ptr)
 static jstring JNICALL
 nxt_java_Request_getServerName(JNIEnv *env, jclass cls, jlong req_ptr)
 {
-    return NULL;
+    char                *host, *colon;
+    nxt_unit_field_t    *f;
+    nxt_unit_request_t  *r;
+
+    r = (nxt_unit_request_t *) req_ptr;
+
+    if (r->host_field != NXT_UNIT_NONE_FIELD) {
+        f = r->fields + r->host_field;
+
+        host = nxt_unit_sptr_get(&f->value);
+
+        colon = memchr(host, ':', f->value_length);
+
+        if (colon == NULL) {
+            colon = host + f->value_length;
+        }
+
+        return nxt_java_newString(env, host, colon - host);
+    }
+
+    return nxt_java_Request_getLocalName(env, cls, req_ptr);
 }
 
 static jint JNICALL
 nxt_java_Request_getServerPort(JNIEnv *env, jclass cls, jlong req_ptr)
 {
-    return 80;
+    jint                res;
+    char                *host, *colon, tmp;
+    nxt_unit_field_t    *f;
+    nxt_unit_request_t  *r;
+
+    r = (nxt_unit_request_t *) req_ptr;
+
+    if (r->host_field != NXT_UNIT_NONE_FIELD) {
+        f = r->fields + r->host_field;
+
+        host = nxt_unit_sptr_get(&f->value);
+
+        colon = memchr(host, ':', f->value_length);
+
+        if (colon == NULL) {
+            return 80;
+        }
+
+        tmp = host[f->value_length];
+
+        host[f->value_length] = '\0';
+
+        res = strtol(colon + 1, NULL, 10);
+
+        host[f->value_length] = tmp;
+
+        return res;
+    }
+
+    return nxt_java_Request_getLocalPort(env, cls, req_ptr);
 }
 
 static void JNICALL
