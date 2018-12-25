@@ -130,6 +130,7 @@ public class Context implements ServletContext, InitParams
     private ClassLoader jsp_loader_;
     private File webapp_;
     private File extracted_dir_;
+    private File temp_dir_;
 
     private final Map<String, String> init_params_ = new HashMap<>();
     private final Map<String, Object> attributes_ = new HashMap<>();
@@ -355,6 +356,10 @@ public class Context implements ServletContext, InitParams
         }
 
         webapp_ = root;
+
+        Path tmpDir = Files.createTempDirectory("webapp");
+        temp_dir_ = tmpDir.toFile();
+        setAttribute(ServletContext.TEMPDIR, temp_dir_);
 
         File web_inf_classes = new File(root, WEB_INF_CLASSES);
         if (web_inf_classes.exists() && web_inf_classes.isDirectory()) {
@@ -1542,6 +1547,10 @@ public class Context implements ServletContext, InitParams
 
             if (extracted_dir_ != null) {
                 removeDir(extracted_dir_);
+            }
+
+            if (temp_dir_ != null) {
+                removeDir(temp_dir_);
             }
         } finally {
             Thread.currentThread().setContextClassLoader(old);
