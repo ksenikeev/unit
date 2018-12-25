@@ -800,7 +800,7 @@ public class Context implements ServletContext, InitParams
             }
 
             Object code = req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
-            if (code != null) {
+            if (code != null && code instanceof Integer) {
                 handleStatusCode((Integer) code, req, resp);
             }
         } catch (Throwable e) {
