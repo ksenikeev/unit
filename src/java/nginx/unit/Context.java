@@ -2348,7 +2348,7 @@ public class Context implements ServletContext, InitParams
                     } catch(AbstractMethodError e) {
                         log("initialized: AbstractMethodError exception caught: " + e);
                     }
-                    destroy_listeners_.add(listener);
+                    destroy_listeners_.add(0, listener);
                 }
             }
 
