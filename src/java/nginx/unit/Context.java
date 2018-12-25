@@ -2771,7 +2771,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public String getServerInfo()
     {
-        trace("getServerInfo for " + server_info_);
+        trace("getServerInfo: " + server_info_);
         return server_info_;
     }
 
@@ -3224,7 +3224,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public void addListener(String className)
     {
-        log("addListener<N> " + className);
+        trace("addListener<N> " + className);
 
         checkContextState();
 
@@ -3250,14 +3250,14 @@ public class Context implements ServletContext, InitParams
     @Override
     public <T extends EventListener> void addListener(T t)
     {
-        log("addListener<T> " + t.getClass().getName());
+        trace("addListener<T> " + t.getClass().getName());
 
         checkContextState();
 
         for (int i = 0; i < LISTENER_TYPES.length; i++) {
             Class<?> c = LISTENER_TYPES[i];
             if (c.isAssignableFrom(t.getClass())) {
-                log("addListener<T>: assignable to " + c.getName());
+                trace("addListener<T>: assignable to " + c.getName());
             }
         }
 
@@ -3295,7 +3295,7 @@ public class Context implements ServletContext, InitParams
     public void addListener(Class<? extends EventListener> listenerClass)
     {
         String className = listenerClass.getName();
-        log("addListener<C> " + className);
+        trace("addListener<C> " + className);
 
         checkContextState();
 
@@ -3320,7 +3320,7 @@ public class Context implements ServletContext, InitParams
     public <T extends EventListener> T createListener(Class<T> clazz)
         throws ServletException
     {
-        log("createListener<C> " + clazz.getName());
+        trace("createListener<C> " + clazz.getName());
 
         checkContextState();
 
@@ -3337,7 +3337,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public ClassLoader getClassLoader()
     {
-        log("getClassLoader");
+        trace("getClassLoader");
         return loader_;
     }
 

@@ -88,8 +88,6 @@ nxt_java_OutputStream_writeByte(JNIEnv *env, jclass cls, jlong req_info_ptr,
     nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
     nxt_java_request_data_t  *data = req->data;
 
-    nxt_unit_req_debug(req, "write byte %d", (int) b);
-
     buf = nxt_java_OutputStream_req_buf(env, req);
     if (buf == NULL) {
         return;
@@ -182,8 +180,6 @@ nxt_java_OutputStream_write(JNIEnv *env, jclass cls, jlong req_info_ptr,
     nxt_java_request_data_t  *data = req->data;
 
     ptr = (*env)->GetPrimitiveArrayCritical(env, b, NULL);
-
-    nxt_unit_req_debug(req, "write '%.*s'", (int) len, (char *) ptr + off);
 
     while (len > 0) {
         buf = nxt_java_OutputStream_req_buf(env, req);
