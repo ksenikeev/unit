@@ -277,7 +277,6 @@ nxt_python_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 
     Py_InitializeEx(0);
 
-    obj = NULL;
     module = NULL;
 
     if (c->path.length > 0) {
@@ -285,7 +284,7 @@ nxt_python_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
                                          c->path.length);
 
         if (nxt_slow_path(obj == NULL)) {
-            nxt_alert(task, "Python failed create string object \"%V\"",
+            nxt_alert(task, "Python failed to create string object \"%V\"",
                       &c->path);
             goto fail;
         }
@@ -304,11 +303,9 @@ nxt_python_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         }
 
         Py_DECREF(obj);
-        obj = NULL;
     }
 
     obj = PyCFunction_New(nxt_py_start_resp_method, NULL);
-
     if (nxt_slow_path(obj == NULL)) {
         nxt_alert(task,
                 "Python failed to initialize the \"start_response\" function");
@@ -318,7 +315,6 @@ nxt_python_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     nxt_py_start_resp_obj = obj;
 
     obj = PyCFunction_New(nxt_py_write_method, NULL);
-
     if (nxt_slow_path(obj == NULL)) {
         nxt_alert(task, "Python failed to initialize the \"write\" function");
         goto fail;
@@ -327,40 +323,37 @@ nxt_python_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     nxt_py_write_obj = obj;
 
     obj = nxt_python_create_environ(task);
-
-    if (obj == NULL) {
+    if (nxt_slow_path(obj == NULL)) {
         goto fail;
     }
 
     nxt_py_environ_ptyp = obj;
 
     obj = Py_BuildValue("[s]", "unit");
-    if (obj == NULL) {
+    if (nxt_slow_path(obj == NULL)) {
         nxt_alert(task, "Python failed to create the \"sys.argv\" list");
         goto fail;
     }
 
-    if (PySys_SetObject((char *) "argv", obj) != 0) {
+    if (nxt_slow_path(PySys_SetObject((char *) "argv", obj) != 0)) {
         nxt_alert(task, "Python failed to set the \"sys.argv\" list");
         goto fail;
     }
 
-    Py_DECREF(obj);
+    Py_CLEAR(obj);
 
     nxt_py_module = nxt_alloca(c->module.length + 1);
     nxt_memcpy(nxt_py_module, c->module.start, c->module.length);
     nxt_py_module[c->module.length] = '\0';
 
     module = PyImport_ImportModule(nxt_py_module);
-
     if (nxt_slow_path(module == NULL)) {
         nxt_alert(task, "Python failed to import module \"%s\"", nxt_py_module);
-        PyErr_PrintEx(1);
-        return NXT_ERROR;
+        PyErr_Print();
+        goto fail;
     }
 
     obj = PyDict_GetItemString(PyModule_GetDict(module), "application");
-
     if (nxt_slow_path(obj == NULL)) {
         nxt_alert(task, "Python failed to get \"application\" "
                   "from module \"%s\"", nxt_py_module);
@@ -370,14 +363,15 @@ nxt_python_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     if (nxt_slow_path(PyCallable_Check(obj) == 0)) {
         nxt_alert(task, "\"application\" in module \"%s\" "
                   "is not a callable object", nxt_py_module);
-        PyErr_PrintEx(1);
+        PyErr_Print();
         goto fail;
     }
 
     Py_INCREF(obj);
-    Py_DECREF(module);
+    Py_CLEAR(module);
 
     nxt_py_application = obj;
+    obj = NULL;
 
     nxt_unit_default_init(task, &python_init);
 
@@ -385,7 +379,7 @@ nxt_python_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 
     unit_ctx = nxt_unit_init(&python_init);
     if (nxt_slow_path(unit_ctx == NULL)) {
-        return NXT_ERROR;
+        goto fail;
     }
 
     rc = nxt_unit_run(unit_ctx);
@@ -403,9 +397,7 @@ fail:
     Py_XDECREF(obj);
     Py_XDECREF(module);
 
-    if (nxt_py_home != NULL) {
-        nxt_free(nxt_py_home);
-    }
+    nxt_python_atexit();
 
     return NXT_ERROR;
 }
@@ -537,10 +529,10 @@ fail:
 static void
 nxt_python_atexit(void)
 {
-    Py_DECREF(nxt_py_application);
-    Py_DECREF(nxt_py_start_resp_obj);
-    Py_DECREF(nxt_py_write_obj);
-    Py_DECREF(nxt_py_environ_ptyp);
+    Py_XDECREF(nxt_py_application);
+    Py_XDECREF(nxt_py_start_resp_obj);
+    Py_XDECREF(nxt_py_write_obj);
+    Py_XDECREF(nxt_py_environ_ptyp);
 
     Py_Finalize();
 
@@ -805,7 +797,7 @@ nxt_python_add_sptr(nxt_python_run_ctx_t *ctx, const char *name,
         nxt_unit_req_error(ctx->req,
                            "Python failed to create value string \"%.*s\"",
                            (int) size, src);
-        PyErr_PrintEx(1);
+        PyErr_Print();
 
         return NXT_UNIT_ERROR;
     }
@@ -840,7 +832,7 @@ nxt_python_add_str(nxt_python_run_ctx_t *ctx, const char *name,
         nxt_unit_req_error(ctx->req,
                            "Python failed to create value string \"%.*s\"",
                            (int) size, str);
-        PyErr_PrintEx(1);
+        PyErr_Print();
 
         return NXT_UNIT_ERROR;
     }

@@ -140,7 +140,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getContextPath()
     {
-        trace("getContextPath");
+        trace("getContextPath: " + context_path);
 
         return context_path;
     }
@@ -217,11 +217,13 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getHeader(String name)
     {
-        trace("getHeader: " + name);
+        String res = getHeader(req_ptr, name, name.length());
 
-        return getHeader(req_ptr, name, name.length());
+        trace("getHeader: " + name + " = '" + res + "'");
+
+        return res;
     }
- 
+
     private static native String getHeader(long req_ptr, String name, int name_len);
 
 
@@ -288,7 +290,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getPathInfo()
     {
-        trace("getPathInfo");
+        trace("getPathInfo: " + path_info);
 
         return path_info;
     }
@@ -308,12 +310,12 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getQueryString()
     {
-        trace("getQueryString");
-
         if (!query_string_valid) {
             query_string = getQueryString(req_ptr);
             query_string_valid = true;
         }
+
+        trace("getQueryString: " + query_string);
 
         return query_string;
     }
@@ -378,11 +380,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getRequestURI()
     {
-        trace("getRequestURI");
-
         if (request_uri == null) {
             request_uri = getRequestURI(req_ptr);
         }
+
+        trace("getRequestURI: " + request_uri);
 
         return request_uri;
     }
@@ -393,6 +395,8 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public void setRequestURI(String uri)
     {
+        trace("setRequestURI: " + uri);
+
         request_uri = uri;
     }
 
@@ -400,17 +404,19 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public StringBuffer getRequestURL()
     {
-        trace("getRequestURL");
-
         String host = getHeader("Host");
         String uri = getRequestURI();
-        return new StringBuffer("http://" + host + uri);
+        StringBuffer res = new StringBuffer("http://" + host + uri);
+
+        trace("getRequestURL: " + res);
+
+        return res;
     }
 
     @Override
     public String getServletPath()
     {
-        trace("getServletPath");
+        trace("getServletPath: " + servlet_path);
 
         return servlet_path;
     }
@@ -418,6 +424,8 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public void setServletPath(String servlet_path, String path_info)
     {
+        trace("setServletPath: " + servlet_path);
+
         this.servlet_path = servlet_path;
         this.path_info = path_info;
     }
@@ -826,9 +834,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getRemoteAddr()
     {
-        trace("getRemoteAddr");
+        String res = getRemoteAddr(req_ptr);
 
-        return getRemoteAddr(req_ptr);
+        trace("getRemoteAddr: " + res);
+
+        return res;
     }
 
     private static native String getRemoteAddr(long req_ptr);
@@ -837,9 +847,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getRemoteHost()
     {
-        trace("getRemoteHost");
+        String res = getRemoteHost(req_ptr);
 
-        return getRemoteHost(req_ptr);
+        trace("getRemoteHost: " + res);
+
+        return res;
     }
 
     private static native String getRemoteHost(long req_ptr);
@@ -848,9 +860,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public int getRemotePort()
     {
-        trace("getRemotePort");
+        int res = getRemotePort(req_ptr);
 
-        return getRemotePort(req_ptr);
+        trace("getRemotePort: " + res);
+
+        return res;
     }
 
     private static native int getRemotePort(long req_ptr);
@@ -888,9 +902,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public String getServerName()
     {
-        trace("getServerName");
+        String res = getServerName(req_ptr);
 
-        return getServerName(req_ptr);
+        trace("getServerName: " + res);
+
+        return res;
     }
 
     private static native String getServerName(long req_ptr);
@@ -899,9 +915,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public int getServerPort()
     {
-        trace("getServerPort");
+        int res = getServerPort(req_ptr);
 
-        return getServerPort(req_ptr);
+        trace("getServerPort: " + res);
+
+        return res;
     }
 
     private static native int getServerPort(long req_ptr);

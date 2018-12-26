@@ -129,12 +129,13 @@ static nxt_int_t
 nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 {
     jint                 rc;
-    char                 *opt, **classpath_arr, **unit_jars, **system_jars, **jsp_jars;
+    char                 *opt, *real_path;
+    char                 **classpath_arr, **unit_jars, **system_jars;
     JavaVM               *jvm;
     JNIEnv               *env;
     nxt_str_t            str;
-    nxt_int_t            opt_len;
-    nxt_uint_t           i, unit_jars_count, classpath_count, system_jars_count, jsp_jars_count;
+    nxt_int_t            opt_len, real_path_len;
+    nxt_uint_t           i, unit_jars_count, classpath_count, system_jars_count;
     JavaVMOption         *jvm_opt;
     JavaVMInitArgs       jvm_args;
     nxt_unit_ctx_t       *ctx;
@@ -177,15 +178,6 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     system_jars = nxt_java_module_jars(nxt_java_system_jars, system_jars_count);
     if (system_jars == NULL) {
         nxt_alert(task, "failed to allocate buffer for system_jars array");
-
-        return NXT_ERROR;
-    }
-
-    jsp_jars_count = nxt_nitems(nxt_java_jsp_jars) - 1;
-
-    jsp_jars = nxt_java_module_jars(nxt_java_jsp_jars, jsp_jars_count);
-    if (jsp_jars == NULL) {
-        nxt_alert(task, "failed to allocate buffer for jsp_jars array");
 
         return NXT_ERROR;
     }
@@ -233,7 +225,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
             opt_len = str.length + 1;
 
             char *sc = memchr(str.start, ':', str.length);
-            if (sc == NULL) {
+            if (sc == NULL && str.start[0] == '/') {
                 opt_len += nxt_length("file:");
             }
 
@@ -243,13 +235,40 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
                 return NXT_ERROR;
             }
 
+            if (sc == NULL && str.start[0] != '/') {
+                nxt_memcpy(opt, str.start, str.length);
+                opt[str.length] = '\0';
+
+                real_path = realpath(opt, NULL);
+                if (real_path == NULL) {
+                    nxt_alert(task, "failed to allocate realpath classpath");
+                    return NXT_ERROR;
+                }
+
+                real_path_len = nxt_strlen(real_path);
+
+                free(opt);
+
+                opt_len = nxt_length("file:") + real_path_len + 1;
+
+                opt = nxt_malloc(opt_len);
+                if (opt == NULL) {
+                    nxt_alert(task, "failed to allocate classpath");
+                    return NXT_ERROR;
+                }
+
+            } else {
+                real_path = (char *) str.start;  /* I love this cast! */
+                real_path_len = str.length;
+            }
+
             classpath_arr[i] = opt;
 
             if (sc == NULL) {
                 opt = nxt_cpymem(opt, "file:", nxt_length("file:"));
             }
 
-            opt = nxt_cpymem(opt, str.start, str.length);
+            opt = nxt_cpymem(opt, real_path, real_path_len);
             *opt = '\0';
         }
 
@@ -328,20 +347,14 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         goto env_failed;
     }
 
-    jobject jsps = nxt_java_newURLs(env, jsp_jars_count, jsp_jars);
-    if (jsps == NULL) {
-        nxt_alert(task, "nxt_java_newURLs failed");
-        goto env_failed;
-    }
-
     jobject classpaths = nxt_java_newURLs(env, classpath_count, classpath_arr);
-    if (jsps == NULL) {
+    if (classpaths == NULL) {
         nxt_alert(task, "nxt_java_newURLs failed");
         goto env_failed;
     }
 
     data.env = env;
-    data.ctx = nxt_java_startContext(env, c->webapp, classpaths, jsps);
+    data.ctx = nxt_java_startContext(env, c->webapp, classpaths);
 
     if ((*env)->ExceptionCheck(env)) {
         nxt_alert(task, "Unhandled exception in application start");

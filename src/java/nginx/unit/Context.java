@@ -109,14 +109,14 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import org.apache.jasper.servlet.JspServlet;
+import org.apache.jasper.servlet.JasperInitializer;
+
 
 public class Context implements ServletContext, InitParams
 {
     public final static int SERVLET_MAJOR_VERSION = 3;
     public final static int SERVLET_MINOR_VERSION = 1;
-
-    private final static String JSP_SERVLET = "org.apache.jasper.servlet.JspServlet";
-    private final static String JASPER_INITIALIZER = "org.apache.jasper.servlet.JasperInitializer";
 
     private String context_path_ = "";
     private String server_info_ = "unit";
@@ -127,9 +127,9 @@ public class Context implements ServletContext, InitParams
     private boolean ctx_initialized_ = false;
 
     private ClassLoader loader_;
-    private ClassLoader jsp_loader_;
     private File webapp_;
     private File extracted_dir_;
+    private File temp_dir_;
 
     private final Map<String, String> init_params_ = new HashMap<>();
     private final Map<String, Object> attributes_ = new HashMap<>();
@@ -318,12 +318,12 @@ public class Context implements ServletContext, InitParams
         }
     }
 
-    public static Context start(String webapp, URL[] classpaths, URL[] jsps)
+    public static Context start(String webapp, URL[] classpaths)
         throws Exception
     {
         Context ctx = new Context();
 
-        ctx.loadApp(webapp, classpaths, jsps);
+        ctx.loadApp(webapp, classpaths);
         ctx.initialized();
 
         return ctx;
@@ -334,7 +334,7 @@ public class Context implements ServletContext, InitParams
         default_session_tracking_modes_.add(SessionTrackingMode.COOKIE);
     }
 
-    public void loadApp(String webapp, URL[] classpaths, URL[] jsps)
+    public void loadApp(String webapp, URL[] classpaths)
         throws Exception
     {
         File root = new File(webapp);
@@ -355,6 +355,10 @@ public class Context implements ServletContext, InitParams
         }
 
         webapp_ = root;
+
+        Path tmpDir = Files.createTempDirectory("webapp");
+        temp_dir_ = tmpDir.toFile();
+        setAttribute(ServletContext.TEMPDIR, temp_dir_);
 
         File web_inf_classes = new File(root, WEB_INF_CLASSES);
         if (web_inf_classes.exists() && web_inf_classes.isDirectory()) {
@@ -379,7 +383,7 @@ public class Context implements ServletContext, InitParams
 
         processWebXml(root);
 
-        loader_ = new CtxClassLoader(urls,
+        loader_ = new AppClassLoader(urls,
             Context.class.getClassLoader().getParent());
 
         ClassLoader old = Thread.currentThread().getContextClassLoader();
@@ -424,15 +428,6 @@ public class Context implements ServletContext, InitParams
             }
 
             if (pattern2servlet_.get("*.jsp") == null) {
-                jsp_loader_ = new URLClassLoader(jsps, loader_);
-
-                trace("startup JasperInitializer");
-
-                Class<?> ji_cls = jsp_loader_.loadClass(JASPER_INITIALIZER);
-                Constructor<?> ji_ctor = ji_cls.getConstructor();
-                ServletContainerInitializer ji = (ServletContainerInitializer) ji_ctor.newInstance();
-                ji.onStartup(Collections.emptySet(), this);
-
                 ServletReg jsp_servlet = new JspServletReg();
                 servlets_.add(jsp_servlet);
 
@@ -462,44 +457,130 @@ public class Context implements ServletContext, InitParams
         }
     }
 
-    private class CtxClassLoader extends URLClassLoader
+    private static class AppClassLoader extends URLClassLoader
     {
-        public CtxClassLoader(URL[] urls, ClassLoader parent)
+        static {
+            ClassLoader.registerAsParallelCapable();
+        }
+
+        private final static String[] system_prefix =
+        {
+            "java/",     // Java SE classes (per servlet spec v2.5 / SRV.9.7.2)
+            "javax/",    // Java SE classes (per servlet spec v2.5 / SRV.9.7.2)
+            "org/w3c/",  // needed by javax.xml
+            "org/xml/",  // needed by javax.xml
+        };
+
+        private ClassLoader system_loader;
+
+        public AppClassLoader(URL[] urls, ClassLoader parent)
         {
             super(urls, parent);
+
+            ClassLoader j = String.class.getClassLoader();
+            if (j == null) {
+                j = getSystemClassLoader();
+                while (j.getParent() != null) {
+                    j = j.getParent();
+                }
+            }
+            system_loader = j; 
+        }
+
+        private boolean isSystemPath(String path)
+        {
+            int i = Arrays.binarySearch(system_prefix, path);
+
+            if (i >= 0) {
+                return true;
+            }
+
+            i = -i - 1;
+
+            if (i > 0) {
+                return path.startsWith(system_prefix[i - 1]);
+            }
+
+            return false;
+        }
+
+        @Override
+        public URL getResource(String name)
+        {
+            URL res;
+
+            String s = "getResource: " + name;
+            trace(0, s, s.length());
+
+            /*
+                This is a required for compatibility with Tomcat which
+                stores all resources prefixed with '/' and application code
+                may try to get resource with leading '/' (like Jira). Jetty
+                also has such workaround in WebAppClassLoader.getResource().
+             */
+            if (name.startsWith("/")) {
+                name = name.substring(1);
+            }
+
+            if (isSystemPath(name)) {
+                return super.getResource(name);
+            }
+
+            res = system_loader.getResource(name);
+            if (res != null) {
+                return res;
+            }
+
+            res = findResource(name);
+            if (res != null) {
+                return res;
+            }
+
+            return super.getResource(name);
         }
 
         @Override
         protected Class<?> loadClass(String name, boolean resolve)
             throws ClassNotFoundException
         {
-            // trace("Loader.loadClass: " + name + "; " + resolve);
+            synchronized (this) {
+                Class<?> res = findLoadedClass(name);
+                if (res != null) {
+                    return res;
+                }
 
-            // Has this loader loaded the class already?
-            Class<?> webapp_class = findLoadedClass(name);
-            if (webapp_class != null) {
-                //trace("found " + name + " loaded");
-                return webapp_class;
-            }
+                try {
+                    res = system_loader.loadClass(name);
 
-            if (name.startsWith("java.") || name.startsWith("javax.")) {
+                    if (resolve) {
+                        resolveClass(res);
+                    }
+
+                    return res;
+                } catch (ClassNotFoundException e) {
+                }
+
+                String path = name.replace('.', '/').concat(".class");
+
+                if (isSystemPath(path)) {
+                    return super.loadClass(name, resolve);
+                }
+
+                URL url = findResource(path);
+
+                if (url != null) {
+                    res = super.findClass(name);
+
+                    if (resolve) {
+                        resolveClass(res);
+                    }
+
+                    return res;
+                }
+
                 return super.loadClass(name, resolve);
             }
 
-            // Try the webapp classloader first
-            // Look in the webapp classloader as a resource, to avoid 
-            // loading a system class.
-            String path = name.replace('.', '/').concat(".class");
-            URL webapp_url = findResource(path);
-
-            if (webapp_url != null) {
-                webapp_class = super.findClass(name); //,webapp_url);
-                resolveClass(webapp_class);
-                //trace("webapp loaded " + name);
-                return webapp_class;
-            }
-
-            return super.loadClass(name, resolve);
         }
     }
 
@@ -795,7 +876,7 @@ public class Context implements ServletContext, InitParams
             }
 
             Object code = req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
-            if (code != null) {
+            if (code != null && code instanceof Integer) {
                 handleStatusCode((Integer) code, req, resp);
             }
         } catch (Throwable e) {
@@ -1543,6 +1624,10 @@ public class Context implements ServletContext, InitParams
             if (extracted_dir_ != null) {
                 removeDir(extracted_dir_);
             }
+
+            if (temp_dir_ != null) {
+                removeDir(temp_dir_);
+            }
         } finally {
             Thread.currentThread().setContextClassLoader(old);
         }
@@ -1707,7 +1792,18 @@ public class Context implements ServletContext, InitParams
                 return;
             }
 
+            init_servlet();
+
+            servlet_.init((ServletConfig) this);
+
+            initialized_ = true;
+        }
+
+        protected void init_servlet() throws ServletException
+        {
             if (servlet_ == null) {
+                trace("ServletReg.init(): " + getName());
+
                 try {
                     if (servlet_class_ == null) {
                         servlet_class_ = loader_.loadClass(getClassName());
@@ -1720,10 +1816,6 @@ public class Context implements ServletContext, InitParams
                     throw new ServletException(e);
                 }
             }
-
-            servlet_.init((ServletConfig) this);
-
-            initialized_ = true;
         }
 
         public void startup() throws ServletException
@@ -1879,21 +1971,17 @@ public class Context implements ServletContext, InitParams
     {
         public JspServletReg() throws ClassNotFoundException
         {
-            super("jsp", jsp_loader_.loadClass(JSP_SERVLET));
+            super("jsp", JspServlet.class);
         }
 
         @Override
-        public void service(ServletRequest request, ServletResponse response)
-            throws ServletException, IOException
+        protected void init_servlet() throws ServletException
         {
-            ClassLoader old = Thread.currentThread().getContextClassLoader();
-            Thread.currentThread().setContextClassLoader(jsp_loader_);
+            JasperInitializer ji = new JasperInitializer();
 
-            try {
-                super.service(request, response);
-            } finally {
-                Thread.currentThread().setContextClassLoader(old);
-            }
+            ji.onStartup(Collections.emptySet(), Context.this);
+
+            super.init_servlet();
         }
     }
 
@@ -2253,7 +2341,7 @@ public class Context implements ServletContext, InitParams
                     } catch(AbstractMethodError e) {
                         log("initialized: AbstractMethodError exception caught: " + e);
                     }
-                    destroy_listeners_.add(listener);
+                    destroy_listeners_.add(0, listener);
                 }
             }
 
@@ -2676,7 +2764,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public String getServerInfo()
     {
-        trace("getServerInfo for " + server_info_);
+        trace("getServerInfo: " + server_info_);
         return server_info_;
     }
 
@@ -3129,7 +3217,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public void addListener(String className)
     {
-        log("addListener<N> " + className);
+        trace("addListener<N> " + className);
 
         checkContextState();
 
@@ -3155,14 +3243,14 @@ public class Context implements ServletContext, InitParams
     @Override
     public <T extends EventListener> void addListener(T t)
     {
-        log("addListener<T> " + t.getClass().getName());
+        trace("addListener<T> " + t.getClass().getName());
 
         checkContextState();
 
         for (int i = 0; i < LISTENER_TYPES.length; i++) {
             Class<?> c = LISTENER_TYPES[i];
             if (c.isAssignableFrom(t.getClass())) {
-                log("addListener<T>: assignable to " + c.getName());
+                trace("addListener<T>: assignable to " + c.getName());
             }
         }
 
@@ -3200,7 +3288,7 @@ public class Context implements ServletContext, InitParams
     public void addListener(Class<? extends EventListener> listenerClass)
     {
         String className = listenerClass.getName();
-        log("addListener<C> " + className);
+        trace("addListener<C> " + className);
 
         checkContextState();
 
@@ -3225,7 +3313,7 @@ public class Context implements ServletContext, InitParams
     public <T extends EventListener> T createListener(Class<T> clazz)
         throws ServletException
     {
-        log("createListener<C> " + clazz.getName());
+        trace("createListener<C> " + clazz.getName());
 
         checkContextState();
 
@@ -3242,7 +3330,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public ClassLoader getClassLoader()
     {
-        log("getClassLoader");
+        trace("getClassLoader");
         return loader_;
     }
 

@@ -543,7 +543,7 @@ public class Response implements HttpServletResponse {
     @Override
     public String getCharacterEncoding()
     {
-        log("getCharacterEncoding");
+        trace("getCharacterEncoding");
 
         return characterEncoding;
     }
@@ -655,7 +655,7 @@ public class Response implements HttpServletResponse {
     @Override
     public void setCharacterEncoding(String charset)
     {
-        log("setCharacterEncoding " + charset);
+        trace("setCharacterEncoding " + charset);
 
         if (isCommitted() || isIncluding()) {
             return;
@@ -719,7 +719,7 @@ public class Response implements HttpServletResponse {
     @Override
     public void setContentType(String type)
     {
-        log("setContentType: " + type);
+        trace("setContentType: " + type);
 
         if (isCommitted() || isIncluding()) {
             return;
