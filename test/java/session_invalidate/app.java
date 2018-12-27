@@ -15,16 +15,11 @@ public class app extends HttpServlet
         throws IOException, ServletException
     {
         HttpSession s = request.getSession();
-        String old_var1 = (String) s.getAttribute("var1");
-        s.setAttribute("var1", request.getParameter("var1"));
 
-        if (old_var1 == null) {
-            response.addHeader("X-Var-1", "null");
-        } else {
-            response.addHeader("X-Var-1", old_var1);
+        if (!s.isNew()) {
+            s.invalidate();
         }
 
         response.addHeader("X-Session-Id", s.getId());
-        response.addHeader("X-Session-New", "" + s.isNew());
     }
 }
