@@ -75,10 +75,12 @@ For details, see here: http://unit.nginx.org/installation/#startup
 Configure Your Java Application
 ###############################
 
-Create your app’s entry as http://localhost/config/applications/*<app name>*:
+Add your app’s entry in Unit configuration as
+``http://localhost/config/applications/<app name>``:
 http://unit.nginx.org/configuration/#example-create-an-application-object
 
-Next, create a listener at http://localhost/config/listeners/*<IP:port>*:
+Next, create a listener for it as
+``http://localhost/config/listeners/<IP:port>``:
 http://unit.nginx.org/configuration/#listeners
 
 See a full config sample here: http://unit.nginx.org/configuration/#full-example
