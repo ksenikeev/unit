@@ -120,4 +120,4 @@ Finally, access your app at the listener’s IP address and port, i.e.:
 
     # curl http://127.0.0.1:8080
 
-Enjoy your brew and the upcoming holidays.
+Enjoy your brew.
