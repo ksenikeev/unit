@@ -16,9 +16,7 @@ public class app extends HttpServlet
     {
         HttpSession s = request.getSession();
 
-        if (!s.isNew()) {
-            s.invalidate();
-        }
+        s.invalidate();
 
         response.addHeader("X-Session-Id", s.getId());
     }

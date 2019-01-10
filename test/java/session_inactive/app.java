@@ -17,7 +17,7 @@ public class app extends HttpServlet
         HttpSession s = request.getSession();
 
         if (s.isNew()) {
-            s.setMaxInactiveInterval(1);
+            s.setMaxInactiveInterval(2);
         }
 
         response.addHeader("X-Session-Id", s.getId());

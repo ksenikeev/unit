@@ -71,18 +71,59 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual(headers['X-Session-New'], 'false', 'session resume')
         self.assertEqual(session_id, headers['X-Session-Id'], 'session same id')
 
-    @unittest.expectedFailure
-    def test_java_application_session_inactive(self):
+    def test_java_application_session_active(self):
         self.load('session_inactive')
 
         resp = self.get()
         session_id = resp['headers']['X-Session-Id']
 
         self.assertEqual(resp['status'], 200, 'session init')
-        self.assertEqual(resp['headers']['X-Session-Interval'], '1', 'session interval')
+        self.assertEqual(resp['headers']['X-Session-Interval'], '2',
+            'session interval')
         self.assertLess(abs(self.date_to_sec_epoch(
             resp['headers']['X-Session-Last-Access-Time']) - self.sec_epoch()),
             5, 'session last access time')
+
+        time.sleep(1)
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Cookie': 'JSESSIONID=' + session_id,
+            'Connection': 'close'
+        })
+
+        self.assertEqual(resp['headers']['X-Session-Id'], session_id,
+            'session active')
+
+        session_id = resp['headers']['X-Session-Id']
+
+        time.sleep(1)
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Cookie': 'JSESSIONID=' + session_id,
+            'Connection': 'close'
+        })
+
+        self.assertEqual(resp['headers']['X-Session-Id'], session_id,
+            'session active 2')
+
+        time.sleep(1)
+
+        resp = self.get(headers={
+            'Host': 'localhost',
+            'Cookie': 'JSESSIONID=' + session_id,
+            'Connection': 'close'
+        })
+
+        self.assertEqual(resp['headers']['X-Session-Id'], session_id,
+            'session active 3')
+
+    def test_java_application_session_inactive(self):
+        self.load('session_inactive')
+
+        resp = self.get()
+        session_id = resp['headers']['X-Session-Id']
 
         time.sleep(3)
 
@@ -92,7 +133,8 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
             'Connection': 'close'
         })
 
-        self.assertNotEqual(resp['status'], 200, 'session inactive')
+        self.assertNotEqual(resp['headers']['X-Session-Id'], session_id,
+            'session inactive')
 
     def test_java_application_session_invalidate(self):
         self.load('session_invalidate')
@@ -100,25 +142,14 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         resp = self.get()
         session_id = resp['headers']['X-Session-Id']
 
-        print(session_id)
-
         resp = self.get(headers={
             'Host': 'localhost',
             'Cookie': 'JSESSIONID=' + session_id,
             'Connection': 'close'
         })
 
-        print(resp['headers']['X-Session-Id'])
-
-        resp = self.get(headers={
-            'Host': 'localhost',
-            'Cookie': 'JSESSIONID=' + session_id,
-            'Connection': 'close'
-        })
-
-        print(resp['headers']['X-Session-Id'])
-
-        #self.assertNotEqual(resp['status'], 200, 'session invalidate')
+        self.assertNotEqual(resp['headers']['X-Session-Id'], session_id,
+            'session invalidate')
 
     def test_java_application_session_listeners(self):
         self.load('session_listeners')
