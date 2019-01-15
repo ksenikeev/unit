@@ -433,27 +433,31 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public HttpSession getSession()
     {
-        trace("getSession");
-
         return getSession(true);
     }
 
     @Override
     public HttpSession getSession(boolean create)
     {
-        trace("getSession: " + create);
-
         if (session != null) {
-            return session;
+            if (context.isSessionIdValid(session.getId())) {
+                trace("getSession(" + create + "): " + session.getId());
+
+                return session;
+            }
+
+            session = null;
         }
 
         if (!request_session_id_parsed) {
             parseRequestSessionId();
+
+            session = context.getSession(request_session_id);
         }
 
-        session = context.getSession(request_session_id);
-
         if (session != null || !create) {
+            trace("getSession(" + create + "): " + (session != null ? session.getId() : "null"));
+
             return session;
         }
 
@@ -464,6 +468,8 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         {
             setSessionIdCookie();
         }
+
+        trace("getSession(" + create + "): " + session.getId());
 
         return session;
     }
