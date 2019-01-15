@@ -624,9 +624,46 @@ public class Context implements ServletContext, InitParams
         private final ServletReg servlet_;
         private final List<FilterReg> filters_;
 
-        CtxFilterChain(ServletReg servlet, List<FilterReg> filters)
+        CtxFilterChain(ServletReg servlet, String path, DispatcherType dtype)
         {
             servlet_ = servlet;
+
+            List<FilterReg> filters = new ArrayList<>();
+
+            if (!context_path_.isEmpty()) {
+                path = path.substring(context_path_.length());
+            }
+
+            for (FilterMap m : filter_maps_) {
+                if (filters.indexOf(m.filter_) != -1) {
+                    continue;
+                }
+
+                if (!m.dtypes_.contains(dtype)) {
+                    continue;
+                }
+
+                if (m.pattern_.match(path)) {
+                    filters.add(m.filter_);
+
+                    trace("add filter (matched): " + m.filter_.getName());
+                }
+            }
+
+            for (FilterMap m : servlet.filters_) {
+                if (filters.indexOf(m.filter_) != -1) {
+                    continue;
+                }
+
+                if (!m.dtypes_.contains(dtype)) {
+                    continue;
+                }
+
+                filters.add(m.filter_);
+
+                trace("add filter (servlet): " + m.filter_.getName());
+            }
+
             filters_ = filters;
         }
 
@@ -844,33 +881,14 @@ public class Context implements ServletContext, InitParams
             }
 
             URI uri = new URI(req.getRequestURI());
-            ServletReg servlet = findServlet(uri.getPath(), req);
+            String path = uri.getPath();
+            ServletReg servlet = findServlet(path, req);
 
             if (servlet == null) {
                 resp.sendError(resp.SC_NOT_FOUND);
 
             } else {
-                List<FilterReg> filters = new ArrayList<>();
-
-                for (FilterMap m : filter_maps_) {
-                    if (filters.indexOf(m.filter_) != -1) {
-                        continue;
-                    }
-
-                    if (m.pattern_.match(uri.getPath())) {
-                        filters.add(m.filter_);
-                    }
-                }
-
-                for (FilterMap m : servlet.filters_) {
-                    if (filters.indexOf(m.filter_) != -1) {
-                        continue;
-                    }
-
-                    filters.add(m.filter_);
-                }
-
-                FilterChain fc = new CtxFilterChain(servlet, filters);
+                FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.REQUEST);
 
                 fc.doFilter(req, resp);
             }
@@ -2432,7 +2450,9 @@ public class Context implements ServletContext, InitParams
             try {
                 trace("URIRequestDispatcher.forward");
 
-                ServletReg servlet = findServlet(uri_.getPath(), req);
+                String path = uri_.getPath();
+
+                ServletReg servlet = findServlet(path, req);
 
                 if (servlet == null) {
                     HttpServletResponse resp = (HttpServletResponse) response;
@@ -2454,7 +2474,9 @@ public class Context implements ServletContext, InitParams
                  */
                 response.resetBuffer();
 
-                servlet.service(request, response);
+                FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.FORWARD);
+
+                fc.doFilter(request, response);
 
                 /*
                     9.4 The Forward Method
@@ -2504,7 +2526,9 @@ public class Context implements ServletContext, InitParams
             try {
                 trace("URIRequestDispatcher.include");
 
-                ServletReg servlet = findServlet(uri_.getPath(), req);
+                String path = uri_.getPath();
+
+                ServletReg servlet = findServlet(path, req);
 
                 if (servlet == null) {
                     /*
@@ -2523,7 +2547,9 @@ public class Context implements ServletContext, InitParams
                 req.setQueryString(uri_.getRawQuery());
                 req.setDispatcherType(DispatcherType.INCLUDE);
 
-                servlet.service(request, response);
+                FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.INCLUDE);
+
+                fc.doFilter(request, response);
 
             } catch (ServletException e) {
                 throw e;
