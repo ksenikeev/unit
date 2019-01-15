@@ -391,9 +391,13 @@ public class Response implements HttpServletResponse {
 */
         }
 
+/*
+        Avoid commit and give chance for error handlers.
+
         if (!request.isAsyncStarted()) {
             commit();
         }
+*/
     }
 
     private static native Request getRequest(long req_info_ptr);
