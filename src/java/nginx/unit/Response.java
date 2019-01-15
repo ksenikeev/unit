@@ -39,6 +39,7 @@ public class Response implements HttpServletResponse {
     private static final String defaultCharacterEncoding = "iso-8859-1";
     private String characterEncoding = defaultCharacterEncoding;
     private String contentType = null;
+    private String contentTypeHeader = null;
 
     private static final Charset ISO_8859_1 = StandardCharsets.ISO_8859_1;
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -575,9 +576,13 @@ public class Response implements HttpServletResponse {
     @Override
     public String getContentType()
     {
-        trace("getContentType");
+        /* In JIRA decorator get content type called after commit. */
 
-        return getContentType(req_info_ptr);
+        String res = contentTypeHeader;
+
+        trace("getContentType: " + res);
+
+        return res;
     }
 
     private static native String getContentType(long req_info_ptr);
@@ -774,6 +779,7 @@ public class Response implements HttpServletResponse {
         }
 
         contentType = ctype;
+        contentTypeHeader = type;
 
         setContentType(req_info_ptr, type.getBytes(ISO_8859_1));
     }
