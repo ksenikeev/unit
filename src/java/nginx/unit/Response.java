@@ -233,6 +233,11 @@ public class Response implements HttpServletResponse {
             return;
         }
 
+        if (CONTENT_TYPE.equalsIgnoreCase(name)) {
+            setContentType(value);
+            return;
+        }
+
         addHeader(req_info_ptr, name.getBytes(ISO_8859_1),
             value.getBytes(ISO_8859_1));
     }
