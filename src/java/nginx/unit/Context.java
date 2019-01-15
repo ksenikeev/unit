@@ -267,6 +267,19 @@ public class Context implements ServletContext, InitParams
 
             File f = new File(webapp_, path);
             if (!f.exists()) {
+                if (request.getDispatcherType() == DispatcherType.INCLUDE) {
+                    /*
+                        9.3 The Include Method
+                        ...
+                        If the default servlet is the target of a
+                        RequestDispatch.include() and the requested resource
+                        does not exist, then the default servlet MUST throw
+                        FileNotFoundException.
+                     */
+
+                    throw new FileNotFoundException();
+                }
+
                 response.sendError(response.SC_NOT_FOUND);
                 return;
             }
@@ -817,12 +830,6 @@ public class Context implements ServletContext, InitParams
             }
         }
 
-        File dir = new File(webapp_, path.substring(1));
-        if (!dir.exists()) {
-            trace("findServlet: file " + dir + " is not exists");
-            return null;
-        }
-
         trace("findServlet: '" + path + "' fallback to system default servlet");
         req.setServletPath(path, null);
 
@@ -912,14 +919,9 @@ public class Context implements ServletContext, InitParams
 
             ServletReg servlet = findServlet(path, req);
 
-            if (servlet == null) {
-                resp.sendError(resp.SC_NOT_FOUND);
+            FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.REQUEST);
 
-            } else {
-                FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.REQUEST);
-
-                fc.doFilter(req, resp);
-            }
+            fc.doFilter(req, resp);
 
             Object code = req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
             if (code != null && code instanceof Integer) {
@@ -1036,14 +1038,9 @@ public class Context implements ServletContext, InitParams
 
             ServletReg servlet = findServlet(path, req);
 
-            if (servlet == null) {
-                resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+            FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.ERROR);
 
-            } else {
-                FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.ERROR);
-
-                fc.doFilter(req, resp);
-            }
+            fc.doFilter(req, resp);
 
             req.setServletPath(servlet_path, path_info);
             req.setRequestURI(req_uri);
@@ -2491,13 +2488,6 @@ public class Context implements ServletContext, InitParams
 
                 ServletReg servlet = findServlet(path, req);
 
-                if (servlet == null) {
-                    HttpServletResponse resp = (HttpServletResponse) response;
-                    resp.sendError(HttpServletResponse.SC_NOT_FOUND);
-
-                    return;
-                }
-
                 req.setRequestURI(uri_.getRawPath());
                 req.setQueryString(uri_.getRawQuery());
                 req.setDispatcherType(DispatcherType.FORWARD);
@@ -2566,19 +2556,6 @@ public class Context implements ServletContext, InitParams
                 String path = uri_.getPath().substring(context_path_.length());
 
                 ServletReg servlet = findServlet(path, req);
-
-                if (servlet == null) {
-                    /*
-                        9.3 The Include Method
-                        ...
-                        If the default servlet is the target of a
-                        RequestDispatch.include() and the requested resource
-                        does not exist, then the default servlet MUST throw
-                        FileNotFoundException.
-                     */
-
-                    throw new FileNotFoundException();
-                }
 
                 req.setRequestURI(uri_.getRawPath());
                 req.setQueryString(uri_.getRawQuery());
