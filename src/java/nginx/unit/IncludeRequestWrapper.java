@@ -31,6 +31,8 @@ public class IncludeRequestWrapper implements DynamicPathRequest
         orig_query_string_attr = request_.getAttribute(RequestDispatcher.INCLUDE_QUERY_STRING);
 
         orig_dtype = request_.getDispatcherType();
+
+        request_.setAttribute_(RequestDispatcher.INCLUDE_CONTEXT_PATH, request_.getContextPath());
     }
 
     @Override

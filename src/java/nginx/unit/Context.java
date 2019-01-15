@@ -332,6 +332,22 @@ public class Context implements ServletContext, InitParams
     public Context()
     {
         default_session_tracking_modes_.add(SessionTrackingMode.COOKIE);
+
+        context_path_ = System.getProperty("nginx.unit.context.path", "").trim();
+
+        if (context_path_.endsWith("/")) {
+            context_path_ = context_path_.substring(0, context_path_.length() - 1);
+        }
+
+        if (!context_path_.isEmpty() && !context_path_.startsWith("/")) {
+            context_path_ = "/" + context_path_;
+        }
+
+        if (!context_path_.isEmpty()) {
+            session_cookie_config_.setPath("/");
+        } else {
+            session_cookie_config_.setPath(context_path_);
+        }
     }
 
     public void loadApp(String webapp, URL[] classpaths)
@@ -630,10 +646,6 @@ public class Context implements ServletContext, InitParams
 
             List<FilterReg> filters = new ArrayList<>();
 
-            if (!context_path_.isEmpty()) {
-                path = path.substring(context_path_.length());
-            }
-
             for (FilterMap m : filter_maps_) {
                 if (filters.indexOf(m.filter_) != -1) {
                     continue;
@@ -683,12 +695,6 @@ public class Context implements ServletContext, InitParams
 
     private ServletReg findServlet(String path, DynamicPathRequest req)
     {
-        if (!path.startsWith(context_path_)) {
-            trace("findServlet: '" + path + "' not started with '" + context_path_ + "'");
-            return null;
-        }
-        path = path.substring(context_path_.length());
-
         /*
             12.1 Use of URL Paths
             ...
@@ -882,6 +888,28 @@ public class Context implements ServletContext, InitParams
 
             URI uri = new URI(req.getRequestURI());
             String path = uri.getPath();
+
+            if (!path.startsWith(context_path_)
+                || (path.length() > context_path_.length()
+                    && path.charAt(context_path_.length()) != '/'))
+            {
+                trace("service: '" + path + "' not started with '" + context_path_ + "'");
+
+                resp.sendError(resp.SC_NOT_FOUND);
+                return;
+            }
+
+            if (path.equals(context_path_)) {
+                String url = req.getRequestURL().toString();
+                if (!url.endsWith("/")) {
+                    resp.setHeader("Location", url + "/");
+                    resp.sendError(resp.SC_FOUND);
+                    return;
+                }
+            }
+
+            path = path.substring(context_path_.length());
+
             ServletReg servlet = findServlet(path, req);
 
             if (servlet == null) {
@@ -993,19 +1021,28 @@ public class Context implements ServletContext, InitParams
             String req_uri = req.getRequestURI();
             DispatcherType dtype = req.getDispatcherType();
 
-            URI uri = new URI(req_uri);
-            uri = uri.resolve(location);
+            URI uri;
+
+            if (location.startsWith("/")) {
+                uri = new URI(context_path_ + location);
+            } else {
+                uri = new URI(req_uri).resolve(location);
+            }
 
             req.setRequestURI(uri.getRawPath());
             req.setDispatcherType(DispatcherType.ERROR);
 
-            ServletReg servlet = findServlet(uri.getPath(), req);
+            String path = uri.getPath().substring(context_path_.length());
+
+            ServletReg servlet = findServlet(path, req);
 
             if (servlet == null) {
                 resp.sendError(HttpServletResponse.SC_NOT_FOUND);
 
             } else {
-                servlet.service(req, resp);
+                FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.ERROR);
+
+                fc.doFilter(req, resp);
             }
 
             req.setServletPath(servlet_path, path_info);
@@ -2450,7 +2487,7 @@ public class Context implements ServletContext, InitParams
             try {
                 trace("URIRequestDispatcher.forward");
 
-                String path = uri_.getPath();
+                String path = uri_.getPath().substring(context_path_.length());
 
                 ServletReg servlet = findServlet(path, req);
 
@@ -2526,7 +2563,7 @@ public class Context implements ServletContext, InitParams
             try {
                 trace("URIRequestDispatcher.include");
 
-                String path = uri_.getPath();
+                String path = uri_.getPath().substring(context_path_.length());
 
                 ServletReg servlet = findServlet(path, req);
 

@@ -72,7 +72,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
 
     private MultiMap<String> parameters = null;
 
-    private String context_path = "";
+    private final String context_path;
     private String servlet_path = "";
     private String path_info = "";
     private String request_uri = null;
@@ -114,6 +114,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         req_ptr = req;
 
         attr_listener = context.getRequestAttributeListener();
+        context_path = context.getContextPath();
     }
 
     @Override
@@ -143,11 +144,6 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         trace("getContextPath: " + context_path);
 
         return context_path;
-    }
-
-    public void setContextPath(String path)
-    {
-        context_path = path;
     }
 
     @Override
@@ -880,6 +876,10 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     public RequestDispatcher getRequestDispatcher(String path)
     {
         trace("getRequestDispatcher: " + path);
+
+        if (path.startsWith("/")) {
+            return context.getRequestDispatcher(path);
+        }
 
         try {
             URI uri = new URI(getRequestURI());
