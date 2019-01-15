@@ -7,6 +7,9 @@ import java.io.PrintWriter;
 import java.lang.IllegalArgumentException;
 import java.lang.String;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -420,7 +423,19 @@ public class Response implements HttpServletResponse {
             return;
         }
 
-        /* TODO resolve relative URL to absolute */
+        try {
+            URI uri = new URI(location);
+
+            if (!uri.isAbsolute()) {
+                URI req_uri = new URI(getRequest(req_info_ptr).getRequestURL().toString());
+                uri = req_uri.resolve(uri);
+
+                location = uri.toString();
+            }
+        } catch (URISyntaxException e) {
+            log("sendRedirect: failed to send redirect: " + e);
+            return;
+        }
 
         sendRedirect(req_info_ptr, location.getBytes(ISO_8859_1));
     }
