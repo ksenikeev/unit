@@ -2890,7 +2890,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public String getContextPath()
     {
-        log("getContextPath");
+        trace("getContextPath");
         return context_path_;
     }
 
