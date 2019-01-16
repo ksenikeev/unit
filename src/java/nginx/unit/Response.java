@@ -713,6 +713,8 @@ public class Response implements HttpServletResponse {
         if (contentType != null) {
             String type = contentType + ";charset=" + characterEncoding;
 
+            contentTypeHeader = type;
+
             setContentType(req_info_ptr, type.getBytes(ISO_8859_1));
         }
     }
@@ -757,6 +759,7 @@ public class Response implements HttpServletResponse {
         if (type == null) {
             removeContentType(req_info_ptr);
             contentType = null;
+            contentTypeHeader = null;
             return;
         }
 
