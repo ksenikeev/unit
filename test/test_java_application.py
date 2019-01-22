@@ -346,10 +346,12 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         resp = self.get(url='/dir1/')
 
         self.assertEqual('This is index.txt.' in resp['body'], True, 'dir1 index body')
+        self.assertEqual(resp['headers']['X-TXT-Filter'], '1', 'TXT Filter header')
 
         headers = self.get(url='/dir2/')['headers']
 
         self.assertEqual(headers['X-Unit-JSP'], 'ok', 'JSP Ok header')
+        self.assertEqual(headers['X-JSP-Filter'], '1', 'JSP Filter header')
 
         headers = self.get(url='/dir3/')['headers']
 
