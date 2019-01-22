@@ -147,8 +147,7 @@ public class Context implements ServletContext, InitParams
     private final List<PrefixPattern> prefix_patterns_ = new ArrayList<>();
     private final Map<String, ServletReg> suffix2servlet_ = new HashMap<>();
     private ServletReg default_servlet_;
-    private ServletReg system_default_servlet_ = new ServletReg("default",
-        new StaticServlet());
+    private ServletReg system_default_servlet_;
 
     private final List<String> welcome_files_ = new ArrayList<>();
 
@@ -461,17 +460,38 @@ public class Context implements ServletContext, InitParams
                 welcome_files_.add("index.jsp");
             }
 
-            if (pattern2servlet_.get("*.jsp") == null) {
-                ServletReg jsp_servlet = new JspServletReg();
+            ServletReg jsp_servlet = name2servlet_.get("jsp");
+            if (jsp_servlet == null) {
+                jsp_servlet = new ServletReg("jsp", JspServlet.class);
+                jsp_servlet.system_jsp_servlet_ = true;
                 servlets_.add(jsp_servlet);
+                name2servlet_.put("jsp", jsp_servlet);
+            }
 
+            if (jsp_servlet.getClassName() == null) {
+                jsp_servlet.setClass(JspServlet.class);
+                jsp_servlet.system_jsp_servlet_ = true;
+            }
+
+            if (jsp_servlet.patterns_.isEmpty()) {
                 parseURLPattern("*.jsp", jsp_servlet);
                 parseURLPattern("*.jspx", jsp_servlet);
             }
 
-            if (!name2servlet_.containsKey("default")) {
-                name2servlet_.put("default", system_default_servlet_);
+            ServletReg def_servlet = name2servlet_.get("default");
+            if (def_servlet == null) {
+                def_servlet = new ServletReg("default", new StaticServlet());
+                def_servlet.servlet_ = new StaticServlet();
+                servlets_.add(def_servlet);
+                name2servlet_.put("default", def_servlet);
             }
+
+            if (def_servlet.getClassName() == null) {
+                def_servlet.setClass(StaticServlet.class);
+                def_servlet.servlet_ = new StaticServlet();
+            }
+
+            system_default_servlet_ = def_servlet;
 
             for (PrefixPattern p : prefix_patterns_) {
                 /*
@@ -871,7 +891,7 @@ public class Context implements ServletContext, InitParams
             presence here. Otherwise user will get 404.
          */
 
-        if (servlet instanceof JspServletReg && !exists) {
+        if (servlet.system_jsp_servlet_ && !exists) {
             trace("findWelcomeServlet: '" + path + "' not exists");
             return null;
         }
@@ -1821,6 +1841,7 @@ public class Context implements ServletContext, InitParams
         private int load_on_startup_ = -1;
         private boolean initialized_ = false;
         private final List<FilterMap> filters_ = new ArrayList<>();
+        private boolean system_jsp_servlet_ = false;
 
         public ServletReg(String name, Class<?> servlet_class)
         {
@@ -1850,18 +1871,15 @@ public class Context implements ServletContext, InitParams
                 return;
             }
 
-            init_servlet();
+            trace("ServletReg.init(): " + getName());
 
-            servlet_.init((ServletConfig) this);
+            if (system_jsp_servlet_) {
+                JasperInitializer ji = new JasperInitializer();
 
-            initialized_ = true;
-        }
+                ji.onStartup(Collections.emptySet(), Context.this);
+            }
 
-        protected void init_servlet() throws ServletException
-        {
             if (servlet_ == null) {
-                trace("ServletReg.init(): " + getName());
-
                 try {
                     if (servlet_class_ == null) {
                         servlet_class_ = loader_.loadClass(getClassName());
@@ -1874,6 +1892,10 @@ public class Context implements ServletContext, InitParams
                     throw new ServletException(e);
                 }
             }
+
+            servlet_.init((ServletConfig) this);
+
+            initialized_ = true;
         }
 
         public void startup() throws ServletException
@@ -2022,24 +2044,6 @@ public class Context implements ServletContext, InitParams
         public ServletContext getServletContext()
         {
             return (ServletContext) Context.this;
-        }
-    }
-
-    private class JspServletReg extends ServletReg
-    {
-        public JspServletReg() throws ClassNotFoundException
-        {
-            super("jsp", JspServlet.class);
-        }
-
-        @Override
-        protected void init_servlet() throws ServletException
-        {
-            JasperInitializer ji = new JasperInitializer();
-
-            ji.onStartup(Collections.emptySet(), Context.this);
-
-            super.init_servlet();
         }
     }
 
