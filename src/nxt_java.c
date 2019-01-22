@@ -81,6 +81,10 @@ nxt_java_pre_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     }
 
     nxt_java_modules = realpath(modules, NULL);
+    if (nxt_java_modules == NULL) {
+        nxt_alert(task, "realpath(%s) failed: %E", modules, nxt_errno);
+        return NXT_ERROR;
+    }
 
     if (slash != NULL) {
         free(modules);
@@ -241,7 +245,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 
                 real_path = realpath(opt, NULL);
                 if (real_path == NULL) {
-                    nxt_alert(task, "failed to allocate realpath classpath");
+                    nxt_alert(task, "realpath(%s) failed: %E", opt, nxt_errno);
                     return NXT_ERROR;
                 }
 
