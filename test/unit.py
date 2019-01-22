@@ -637,7 +637,8 @@ class TestUnitApplicationJava(TestUnitApplicationProto):
             if not os.path.isdir(classes_path):
                 os.makedirs(classes_path)
 
-            javac = ['javac', '-d', classes_path, '-classpath',
+            javac = ['javac', '-encoding', 'utf-8', '-d', classes_path,
+                '-classpath',
                 self.pardir + '/build/tomcat-servlet-api-9.0.13.jar']
             javac.extend(src)
 
