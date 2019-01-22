@@ -157,7 +157,7 @@ public class Response implements HttpServletResponse {
             throw new IllegalArgumentException("Cookie.name cannot be blank/null");
         }
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -206,7 +206,7 @@ public class Response implements HttpServletResponse {
     {
         trace("addDateHeader: " + name + ": " + date);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -233,7 +233,7 @@ public class Response implements HttpServletResponse {
             return;
         }
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -254,7 +254,7 @@ public class Response implements HttpServletResponse {
     {
         trace("addIntHeader: " + name + ": " + value);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -424,7 +424,7 @@ public class Response implements HttpServletResponse {
     {
         trace("sendRedirect: " + location);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -453,7 +453,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setDateHeader: " + name + ": " + date);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -469,7 +469,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setHeader: " + name + ": " + value);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -501,7 +501,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setIntHeader: " + name + ": " + value);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -516,7 +516,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setStatus: " + sc);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -532,7 +532,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setStatus: " + sc + "; " + sm);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -646,7 +646,7 @@ public class Response implements HttpServletResponse {
     {
         trace("reset");
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -686,7 +686,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setCharacterEncoding " + charset);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -725,7 +725,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setContentLength: " + len);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -737,7 +737,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setContentLengthLong: " + len);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -752,7 +752,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setContentType: " + type);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -790,12 +790,6 @@ public class Response implements HttpServletResponse {
     private static native void setContentType(long req_info_ptr, byte[] type);
 
     private static native void removeContentType(long req_info_ptr);
-
-    public boolean isIncluding()
-    {
-        return getRequest(req_info_ptr).getDispatcherType()
-            == DispatcherType.INCLUDE;
-    }
 
 
     @Override

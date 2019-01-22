@@ -2573,7 +2573,7 @@ public class Context implements ServletContext, InitParams
 
                 FilterChain fc = new CtxFilterChain(servlet, req.getFilterPath(), DispatcherType.INCLUDE);
 
-                fc.doFilter(request, response);
+                fc.doFilter(request, new IncludeResponseWrapper(response));
 
             } catch (ServletException e) {
                 throw e;
@@ -2694,7 +2694,7 @@ public class Context implements ServletContext, InitParams
             try {
                 req.setDispatcherType(DispatcherType.INCLUDE);
 
-                servlet_.service(request, response);
+                servlet_.service(request, new IncludeResponseWrapper(response));
 
             } catch (ServletException e) {
                 throw e;
