@@ -73,8 +73,9 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     private MultiMap<String> parameters = null;
 
     private final String context_path;
-    private String servlet_path = "";
-    private String path_info = "";
+    private String filter_path = null;
+    private String servlet_path = null;
+    private String path_info = null;
     private String request_uri = null;
     private String query_string = null;
     private boolean query_string_valid = false;
@@ -422,8 +423,25 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         trace("setServletPath: " + servlet_path);
 
+        this.filter_path = servlet_path;
         this.servlet_path = servlet_path;
         this.path_info = path_info;
+    }
+
+    @Override
+    public void setServletPath(String filter_path, String servlet_path, String path_info)
+    {
+        trace("setServletPath: " + filter_path + ", " + servlet_path);
+
+        this.filter_path = filter_path;
+        this.servlet_path = servlet_path;
+        this.path_info = path_info;
+    }
+
+    @Override
+    public String getFilterPath()
+    {
+        return filter_path;
     }
 
     @Override

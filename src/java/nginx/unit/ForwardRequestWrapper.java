@@ -11,6 +11,7 @@ public class ForwardRequestWrapper implements DynamicPathRequest
 
     private final boolean keep_attrs;
 
+    private final String orig_filter_path;
     private final String orig_servlet_path;
     private final String orig_path_info;
     private final String orig_uri;
@@ -31,6 +32,7 @@ public class ForwardRequestWrapper implements DynamicPathRequest
 
         orig_dtype = request_.getDispatcherType();
 
+        orig_filter_path = request_.getFilterPath();
         orig_servlet_path = request_.getServletPath();
         orig_path_info = request_.getPathInfo();
         orig_uri = request_.getRequestURI();
@@ -79,6 +81,12 @@ public class ForwardRequestWrapper implements DynamicPathRequest
     }
 
     @Override
+    public void setServletPath(String filter_path, String servlet_path, String path_info)
+    {
+        request_.setServletPath(filter_path, servlet_path, path_info);
+    }
+
+    @Override
     public void setRequestURI(String uri)
     {
         request_.setRequestURI(uri);
@@ -92,12 +100,18 @@ public class ForwardRequestWrapper implements DynamicPathRequest
         }
     }
 
+    @Override
+    public String getFilterPath()
+    {
+        return request_.getFilterPath();
+    }
+
     public void close()
     {
         request_.setDispatcherType(orig_dtype);
 
         request_.setRequestURI(orig_uri);
-        request_.setServletPath(orig_servlet_path, orig_path_info);
+        request_.setServletPath(orig_filter_path, orig_servlet_path, orig_path_info);
         request_.setQueryString(orig_query);
 
         if (keep_attrs) {

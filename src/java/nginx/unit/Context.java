@@ -738,9 +738,9 @@ public class Context implements ServletContext, InitParams
                 trace("findServlet: '" + path + "' matched prefix pattern '" + p.pattern + "'");
                 if (p.pattern.length() == path.length()) {
                     log("findServlet: WARNING: it is expected '" + path + "' exactly matches " + p.pattern);
-                    req.setServletPath(p.pattern, null);
+                    req.setServletPath(path, p.pattern, null);
                 } else {
-                    req.setServletPath(p.pattern, path.substring(p.pattern.length()));
+                    req.setServletPath(path, p.pattern, path.substring(p.pattern.length()));
                 }
                 return p.servlet;
             }
@@ -924,7 +924,7 @@ public class Context implements ServletContext, InitParams
 
             ServletReg servlet = findServlet(path, req);
 
-            FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.REQUEST);
+            FilterChain fc = new CtxFilterChain(servlet, req.getFilterPath(), DispatcherType.REQUEST);
 
             fc.doFilter(req, resp);
 
@@ -1023,6 +1023,7 @@ public class Context implements ServletContext, InitParams
         try {
             log("handleError: " + location);
 
+            String filter_path = req.getFilterPath();
             String servlet_path = req.getServletPath();
             String path_info = req.getPathInfo();
             String req_uri = req.getRequestURI();
@@ -1043,11 +1044,11 @@ public class Context implements ServletContext, InitParams
 
             ServletReg servlet = findServlet(path, req);
 
-            FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.ERROR);
+            FilterChain fc = new CtxFilterChain(servlet, req.getFilterPath(), DispatcherType.ERROR);
 
             fc.doFilter(req, resp);
 
-            req.setServletPath(servlet_path, path_info);
+            req.setServletPath(filter_path, servlet_path, path_info);
             req.setRequestURI(req_uri);
             req.setDispatcherType(dtype);
         } catch (URISyntaxException e) {
@@ -2506,7 +2507,7 @@ public class Context implements ServletContext, InitParams
                  */
                 response.resetBuffer();
 
-                FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.FORWARD);
+                FilterChain fc = new CtxFilterChain(servlet, req.getFilterPath(), DispatcherType.FORWARD);
 
                 fc.doFilter(request, response);
 
@@ -2566,7 +2567,7 @@ public class Context implements ServletContext, InitParams
                 req.setQueryString(uri_.getRawQuery());
                 req.setDispatcherType(DispatcherType.INCLUDE);
 
-                FilterChain fc = new CtxFilterChain(servlet, path, DispatcherType.INCLUDE);
+                FilterChain fc = new CtxFilterChain(servlet, req.getFilterPath(), DispatcherType.INCLUDE);
 
                 fc.doFilter(request, response);
 
