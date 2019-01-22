@@ -410,6 +410,11 @@ public class Context implements ServletContext, InitParams
             trace("archives: " + urls[i]);
         }
 
+        String custom_listener = System.getProperty("nginx.unit.context.listener", "").trim();
+        if (!custom_listener.isEmpty()) {
+            pending_listener_classnames_.add(custom_listener);
+        }
+
         processWebXml(root);
 
         loader_ = new AppClassLoader(urls,
