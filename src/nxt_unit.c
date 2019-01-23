@@ -1129,7 +1129,7 @@ nxt_unit_response_realloc(nxt_unit_request_info_t *req,
             continue;
         }
 
-        if (nxt_slow_path(src->name_length + src->value_length
+        if (nxt_slow_path(src->name_length + src->value_length + 2
                           > (uint32_t) (buf->end - p)))
         {
             nxt_unit_req_warn(req, "realloc: not enough space for field"
@@ -1141,9 +1141,11 @@ nxt_unit_response_realloc(nxt_unit_request_info_t *req,
 
         nxt_unit_sptr_set(&f->name, p);
         p = nxt_cpymem(p, nxt_unit_sptr_get(&src->name), src->name_length);
+        *p++ = '\0';
 
         nxt_unit_sptr_set(&f->value, p);
         p = nxt_cpymem(p, nxt_unit_sptr_get(&src->value), src->value_length);
+        *p++ = '\0';
 
         f->hash = src->hash;
         f->skip = 0;
@@ -1230,7 +1232,7 @@ nxt_unit_response_add_field(nxt_unit_request_info_t *req,
 
     buf = req->response_buf;
 
-    if (nxt_slow_path(name_length + value_length
+    if (nxt_slow_path(name_length + value_length + 2
                       > (uint32_t) (buf->end - buf->free)))
     {
         nxt_unit_req_warn(req, "add_field: response buffer overflow");
