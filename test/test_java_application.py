@@ -531,7 +531,7 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual(headers['X-After-Include'], 'you-should-see-this',
             'add headers after include() call')
         self.assertEqual('After include' in body, True,
-            'add data after forward() call')
+            'add data after include() call')
 
     def test_java_application_named_dispatcher_include(self):
         self.load('include')
@@ -564,7 +564,7 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual(headers['X-After-Include'], 'you-should-see-this',
             'add headers after include() call')
         self.assertEqual('After include' in body, True,
-            'add data after forward() call')
+            'add data after include() call')
 
     def test_java_application_path_translation(self):
         self.load('path_translation')
