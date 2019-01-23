@@ -75,6 +75,12 @@ public class app extends HttpServlet
 
         response.setContentType("text/plain; charset=utf-8");
 
+        Map<String, String[]> pmap = request.getParameterMap();
+
+        for (Map.Entry<String,String[]> p : pmap.entrySet()) {
+            response.addHeader("X-" + dtype + "-Param-" + p.getKey(), "" + String.join(",", p.getValue()));
+        }
+
         PrintWriter out = response.getWriter();
 
         if (id.equals("fwd")) {
@@ -119,8 +125,6 @@ public class app extends HttpServlet
             out.println("PathInfo:    " + request.getPathInfo());
             out.println("DispType:    " + request.getDispatcherType());
             out.println("QueryString: " + request.getQueryString());
-
-            Map<String, String[]> pmap = request.getParameterMap();
 
             for (Map.Entry<String,String[]> p : pmap.entrySet()) {
                 out.println("- " + p.getKey() + "=" + String.join(",", p.getValue()));

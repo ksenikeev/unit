@@ -752,7 +752,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     private static native int getLocalPort(long req_ptr);
 
 
-    private MultiMap<String> getParameters()
+    public MultiMap<String> getParameters()
     {
         if (parameters != null) {
             return parameters;
@@ -779,6 +779,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         }
 
         return parameters;
+    }
+
+    public void setParameters(MultiMap<String> p)
+    {
+        parameters = p;
     }
 
     @Override

@@ -1,9 +1,15 @@
 package nginx.unit;
 
+import java.util.List;
+import java.util.Map;
+
 import javax.servlet.DispatcherType;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletRequest;
 import javax.servlet.http.HttpServletRequest;
+
+import org.eclipse.jetty.util.MultiMap;
+import org.eclipse.jetty.util.UrlEncoded;
 
 public class ForwardRequestWrapper implements DynamicPathRequest
 {
@@ -19,6 +25,8 @@ public class ForwardRequestWrapper implements DynamicPathRequest
     private final String orig_query;
 
     private final DispatcherType orig_dtype;
+
+    private MultiMap<String> orig_parameters;
 
     public ForwardRequestWrapper(ServletRequest request)
     {
@@ -96,6 +104,17 @@ public class ForwardRequestWrapper implements DynamicPathRequest
     public void setQueryString(String query)
     {
         if (query != null) {
+            orig_parameters = request_.getParameters();
+
+            MultiMap<String> parameters = new MultiMap<>();
+            UrlEncoded.decodeUtf8To(query, parameters);
+
+            for (Map.Entry<String, List<String>> e: orig_parameters.entrySet()) {
+                parameters.addValues(e.getKey(), e.getValue());
+            }
+
+            request_.setParameters(parameters);
+
             request_.setQueryString(query);
         }
     }
@@ -113,6 +132,10 @@ public class ForwardRequestWrapper implements DynamicPathRequest
         request_.setRequestURI(orig_uri);
         request_.setServletPath(orig_filter_path, orig_servlet_path, orig_path_info);
         request_.setQueryString(orig_query);
+
+        if (orig_parameters != null) {
+            request_.setParameters(orig_parameters);
+        }
 
         if (keep_attrs) {
             return;

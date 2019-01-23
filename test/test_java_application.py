@@ -423,13 +423,19 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
     def test_java_application_request_uri_forward(self):
         self.load('forward')
 
-        resp = self.get(url='/fwd?uri=/data/test')
+        resp = self.get(url='/fwd?uri=%2Fdata%2Ftest%3Furi%3Dnew_uri%26a%3D2%26b%3D3&a=1&c=4')
         headers = resp['headers']
 
         self.assertEqual(headers['X-REQUEST-Id'], 'fwd',
             'initial request servlet mapping')
-        self.assertEqual(headers['X-Forward-To'], '/data/test',
+        self.assertEqual(headers['X-Forward-To'], '/data/test?uri=new_uri&a=2&b=3',
             'forwarding triggered')
+        self.assertEqual(headers['X-REQUEST-Param-uri'], '/data/test?uri=new_uri&a=2&b=3',
+            'original uri parameter')
+        self.assertEqual(headers['X-REQUEST-Param-a'], '1',
+            'original a parameter')
+        self.assertEqual(headers['X-REQUEST-Param-c'], '4',
+            'original c parameter')
 
         self.assertEqual(headers['X-FORWARD-Id'], 'data',
             'forward request servlet mapping')
@@ -439,8 +445,16 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
             'forward request servlet path')
         self.assertEqual(headers['X-FORWARD-Path-Info'], '/test',
             'forward request path info')
-        self.assertEqual(headers['X-FORWARD-Query-String'], 'uri=/data/test',
+        self.assertEqual(headers['X-FORWARD-Query-String'], 'uri=new_uri&a=2&b=3',
             'forward request query string')
+        self.assertEqual(headers['X-FORWARD-Param-uri'], 'new_uri,/data/test?uri=new_uri&a=2&b=3',
+            'forward uri parameter')
+        self.assertEqual(headers['X-FORWARD-Param-a'], '2,1',
+            'forward a parameter')
+        self.assertEqual(headers['X-FORWARD-Param-b'], '3',
+            'forward b parameter')
+        self.assertEqual(headers['X-FORWARD-Param-c'], '4',
+            'forward c parameter')
 
         self.assertEqual(headers['X-javax.servlet.forward.request_uri'], '/fwd',
             'original request uri')
@@ -450,7 +464,7 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
             'original request servlet path')
         self.assertEqual(headers['X-javax.servlet.forward.path_info'], 'null',
             'original request path info')
-        self.assertEqual(headers['X-javax.servlet.forward.query_string'], 'uri=/data/test',
+        self.assertEqual(headers['X-javax.servlet.forward.query_string'], 'uri=%2Fdata%2Ftest%3Furi%3Dnew_uri%26a%3D2%26b%3D3&a=1&c=4',
             'original request query')
 
         self.assertEqual('Before forwarding' in resp['body'], False,
