@@ -245,7 +245,7 @@ public class Context implements ServletContext, InitParams
                 10.6 Web Application Archive File
                 ...
                 This directory [META-INF] must not be directly served as
-                content by the container in response to a Web client’s request,
+                content by the container in response to a Web client's request,
                 though its contents are visible to servlet code via the
                 getResource and getResourceAsStream calls on the
                 ServletContext. Also, any requests to access the resources in
@@ -2507,7 +2507,7 @@ public class Context implements ServletContext, InitParams
                     ...
                     If output data exists in the response buffer that has not
                     been committed, the content must be cleared before the
-                    target servlet’s service method is called.
+                    target servlet's service method is called.
                  */
                 response.resetBuffer();
 
@@ -2631,7 +2631,7 @@ public class Context implements ServletContext, InitParams
                     ...
                     If output data exists in the response buffer that has not
                     been committed, the content must be cleared before the
-                    target servlet’s service method is called.
+                    target servlet's service method is called.
                  */
                 response.resetBuffer();
 
