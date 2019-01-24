@@ -135,6 +135,9 @@ case "$NXT_SYSTEM" in
     Darwin)
         NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/darwin"
         ;;
+    FreeBSD)
+        NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/freebsd"
+        ;;
 esac
 
 if [ -z "$NXT_JAVA_LIB_PATH" ]; then
