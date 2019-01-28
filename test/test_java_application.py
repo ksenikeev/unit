@@ -631,6 +631,114 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
         self.assertEqual(self.get()['headers']['X-Query-String'], 'null',
             'query string absent')
 
+    def test_java_application_empty(self):
+        self.load('empty')
+
+        self.assertEqual(self.get()['status'], 200, 'empty')
+
+    def test_java_application_keepalive_body(self):
+        self.load('mirror')
+
+        (resp, sock) = self.post(headers={
+            'Connection': 'keep-alive',
+            'Content-Type': 'text/html',
+            'Host': 'localhost'
+        }, start=True, body='0123456789' * 500)
+
+        self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')
+
+        resp = self.post(headers={
+            'Connection': 'close',
+            'Content-Type': 'text/html',
+            'Host': 'localhost'
+        }, sock=sock, body='0123456789')
+
+        self.assertEqual(resp['body'], '0123456789', 'keep-alive 2')
+
+    def test_java_application_http_10(self):
+        self.load('empty')
+
+        self.assertEqual(self.get(http_10=True)['status'], 200, 'HTTP 1.0')
+
+    def test_java_application_no_method(self):
+        self.load('empty')
+
+        self.assertEqual(self.post()['status'], 405, 'no method')
+
+    def test_java_application_get_header(self):
+        self.load('get_header')
+
+        self.assertEqual(self.get(headers={
+            'X-Header': 'blah',
+            'Content-Type': 'text/html',
+            'Host': 'localhost'
+        })['headers']['X-Reply'], 'blah', 'get header')
+
+    def test_java_application_get_header_empty(self):
+        self.load('get_header')
+
+        self.assertNotIn('X-Reply', self.get()['headers'], 'get header empty')
+
+    def test_java_application_get_headers(self):
+        self.load('get_headers')
+
+        headers = self.get(headers={
+            'X-Header': ['blah', 'blah'],
+            'Content-Type': 'text/html',
+            'Host': 'localhost'
+        })['headers']
+
+        self.assertEqual(headers['X-Reply-0'], 'blah', 'get headers')
+        self.assertEqual(headers['X-Reply-1'], 'blah', 'get headers 2')
+
+    def test_java_application_get_headers_empty(self):
+        self.load('get_headers')
+
+        self.assertNotIn('X-Reply-0', self.get()['headers'],
+            'get headers empty')
+
+    def test_java_application_get_header_names(self):
+        self.load('get_header_names')
+
+        headers = self.get()['headers']
+
+        self.assertRegex(headers['X-Reply-0'], r'(?:Host|Connection)',
+            'get header names')
+        self.assertRegex(headers['X-Reply-1'], r'(?:Host|Connection)',
+            'get header names 2')
+
+    def test_java_application_get_header_names_empty(self):
+        self.load('get_header_names')
+
+        self.assertNotIn('X-Reply-0', self.get(headers={})['headers'],
+            'get header names empty')
+
+    def test_java_application_header_int(self):
+        self.load('header_int')
+
+        headers = self.get(headers={
+            'X-Header': '2',
+            'Content-Type': 'text/html',
+            'Host': 'localhost'
+        })['headers']
+
+        self.assertEqual(headers['X-Set-Int'], '1', 'set int header')
+        self.assertEqual(headers['X-Get-Int'], '2', 'get int header')
+
+    def test_java_application_header_date(self):
+        self.load('header_date')
+
+        date = 'Fri, 15 Mar 2019 14:45:34 GMT'
+
+        headers = self.get(headers={
+            'X-Header': date,
+            'Content-Type': 'text/html',
+            'Host': 'localhost'
+        })['headers']
+
+        self.assertEqual(headers['X-Set-Date'], 'Thu, 01 Jan 1970 00:00:01 GMT',
+            'set date header')
+        self.assertEqual(headers['X-Get-Date'], date, 'get date header')
 
 if __name__ == '__main__':
     TestUnitJavaApplication.main()
