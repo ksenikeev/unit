@@ -355,7 +355,7 @@ public class Context implements ServletContext, InitParams
             context_path_ = "/" + context_path_;
         }
 
-        if (!context_path_.isEmpty()) {
+        if (context_path_.isEmpty()) {
             session_cookie_config_.setPath("/");
         } else {
             session_cookie_config_.setPath(context_path_);
