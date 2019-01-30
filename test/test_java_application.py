@@ -33,11 +33,18 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
     def test_java_application_get_variables(self):
         self.load('get_params')
 
-        headers = self.get(url='/?var1=val1&var2=')['headers']
+        headers = self.get(url='/?var1=val1&var2=&var4=val4&var4=foo')['headers']
 
         self.assertEqual(headers['X-Var-1'], 'val1', 'GET variables')
         self.assertEqual(headers['X-Var-2'], 'true', 'GET variables 2')
         self.assertEqual(headers['X-Var-3'], 'false', 'GET variables 3')
+
+        self.assertEqual(headers['X-Param-Names'], 'var4 var2 var1 ',
+            'getParameterNames')
+        self.assertEqual(headers['X-Param-Values'], 'val4 foo ',
+            'getParameterValues')
+        self.assertEqual(headers['X-Param-Map'],
+            'var2= var1=val1 var4=val4,foo ', 'getParameterMap')
 
     def test_java_application_post_variables(self):
         self.load('post_params')
@@ -706,6 +713,8 @@ class TestUnitJavaApplication(unit.TestUnitApplicationJava):
             'get header names')
         self.assertRegex(headers['X-Reply-1'], r'(?:Host|Connection)',
             'get header names 2')
+        self.assertNotEqual(headers['X-Reply-0'], headers['X-Reply-1'],
+            'get header names not equal')
 
     def test_java_application_get_header_names_empty(self):
         self.load('get_header_names')
