@@ -268,7 +268,7 @@ nxt_java_Response_addHeader(JNIEnv *env, jclass cls, jlong req_info_ptr,
     name_len = (*env)->GetArrayLength(env, name);
     value_len = (*env)->GetArrayLength(env, value);
 
-    req = nxt_java_get_response_info(req_info_ptr, 1, name_len + value_len);
+    req = nxt_java_get_response_info(req_info_ptr, 1, name_len + value_len + 2);
     if (req == NULL) {
         return;
     }
@@ -701,7 +701,7 @@ nxt_java_response_set_header(jlong req_info_ptr,
         return NXT_UNIT_OK;
     }
 
-    req = nxt_java_get_response_info(req_info_ptr, 1, name_len + value_len);
+    req = nxt_java_get_response_info(req_info_ptr, 1, name_len + value_len + 2);
     if (req == NULL) {
         return NXT_UNIT_ERROR;
     }

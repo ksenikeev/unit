@@ -135,6 +135,9 @@ case "$NXT_SYSTEM" in
     Darwin)
         NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/darwin"
         ;;
+    FreeBSD)
+        NXT_JAVA_INCLUDE="${NXT_JAVA_INCLUDE} -I${NXT_JAVA_HOME}/include/freebsd"
+        ;;
 esac
 
 if [ -z "$NXT_JAVA_LIB_PATH" ]; then
@@ -358,6 +361,7 @@ NXT_JAVA_CLASSES = \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/HeaderNamesEnumeration.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/HeadersEnumeration.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/IncludeRequestWrapper.class \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/IncludeResponseWrapper.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/InitParams.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/InputStream.class \\
     $NXT_BUILD_DIR/$NXT_JAVA_MODULE/nginx/unit/JspPropertyGroup.class \\

@@ -1129,7 +1129,7 @@ nxt_unit_response_realloc(nxt_unit_request_info_t *req,
             continue;
         }
 
-        if (nxt_slow_path(src->name_length + src->value_length
+        if (nxt_slow_path(src->name_length + src->value_length + 2
                           > (uint32_t) (buf->end - p)))
         {
             nxt_unit_req_warn(req, "realloc: not enough space for field"
@@ -1141,9 +1141,11 @@ nxt_unit_response_realloc(nxt_unit_request_info_t *req,
 
         nxt_unit_sptr_set(&f->name, p);
         p = nxt_cpymem(p, nxt_unit_sptr_get(&src->name), src->name_length);
+        *p++ = '\0';
 
         nxt_unit_sptr_set(&f->value, p);
         p = nxt_cpymem(p, nxt_unit_sptr_get(&src->value), src->value_length);
+        *p++ = '\0';
 
         f->hash = src->hash;
         f->skip = 0;
@@ -1230,7 +1232,7 @@ nxt_unit_response_add_field(nxt_unit_request_info_t *req,
 
     buf = req->response_buf;
 
-    if (nxt_slow_path(name_length + value_length
+    if (nxt_slow_path(name_length + value_length + 2
                       > (uint32_t) (buf->end - buf->free)))
     {
         nxt_unit_req_warn(req, "add_field: response buffer overflow");
@@ -2524,14 +2526,12 @@ nxt_unit_mmap_read(nxt_unit_ctx_t *ctx, nxt_unit_recv_msg_t *recv_msg,
         b->buf.end = b->buf.start + size;
         b->hdr = hdr;
 
-        nxt_unit_debug(ctx, "#%"PRIu32": mmap_read: [%p,%d] %d->%d,(%d,%d,%d)\n"
-                       "%.*s",
+        nxt_unit_debug(ctx, "#%"PRIu32": mmap_read: [%p,%d] %d->%d,(%d,%d,%d)",
                        recv_msg->port_msg.stream,
                        start, (int) size,
                        (int) hdr->src_pid, (int) hdr->dst_pid,
                        (int) hdr->id, (int) mmap_msg->chunk_id,
-                       (int) mmap_msg->size,
-                       (int) size, (char *) start);
+                       (int) mmap_msg->size);
     }
 
     pthread_mutex_unlock(&process->incoming.mutex);

@@ -89,7 +89,11 @@ endif
 ifeq ($(OSVER), fedora)
 include Makefile.php
 include Makefile.python27
+ifeq ($(shell test `rpm --eval '0%{?fedora} -ge 29'`; echo $$?),0)
+include Makefile.python37
+else
 include Makefile.python36
+endif
 include Makefile.go
 include Makefile.perl
 include Makefile.ruby
@@ -98,7 +102,7 @@ endif
 CONFIGURE_ARGS=\
 	--prefix=/usr \
 	--state=%{_sharedstatedir}/unit \
-	--control="unix:/var/run/control.unit.sock" \
+	--control="unix:/var/run/unit/control.sock" \
 	--pid=/var/run/unit.pid \
 	--log=/var/log/unit.log \
 	--tests \

@@ -72,9 +72,10 @@ public class Request implements HttpServletRequest, DynamicPathRequest
 
     private MultiMap<String> parameters = null;
 
-    private String context_path = "";
-    private String servlet_path = "";
-    private String path_info = "";
+    private final String context_path;
+    private String filter_path = null;
+    private String servlet_path = null;
+    private String path_info = null;
     private String request_uri = null;
     private String query_string = null;
     private boolean query_string_valid = false;
@@ -114,6 +115,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         req_ptr = req;
 
         attr_listener = context.getRequestAttributeListener();
+        context_path = context.getContextPath();
     }
 
     @Override
@@ -143,11 +145,6 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         trace("getContextPath: " + context_path);
 
         return context_path;
-    }
-
-    public void setContextPath(String path)
-    {
-        context_path = path;
     }
 
     @Override
@@ -426,34 +423,55 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     {
         trace("setServletPath: " + servlet_path);
 
+        this.filter_path = servlet_path;
         this.servlet_path = servlet_path;
         this.path_info = path_info;
     }
 
     @Override
+    public void setServletPath(String filter_path, String servlet_path, String path_info)
+    {
+        trace("setServletPath: " + filter_path + ", " + servlet_path);
+
+        this.filter_path = filter_path;
+        this.servlet_path = servlet_path;
+        this.path_info = path_info;
+    }
+
+    @Override
+    public String getFilterPath()
+    {
+        return filter_path;
+    }
+
+    @Override
     public HttpSession getSession()
     {
-        trace("getSession");
-
         return getSession(true);
     }
 
     @Override
     public HttpSession getSession(boolean create)
     {
-        trace("getSession: " + create);
-
         if (session != null) {
-            return session;
+            if (context.isSessionIdValid(session.getId())) {
+                trace("getSession(" + create + "): " + session.getId());
+
+                return session;
+            }
+
+            session = null;
         }
 
         if (!request_session_id_parsed) {
             parseRequestSessionId();
+
+            session = context.getSession(request_session_id);
         }
 
-        session = context.getSession(request_session_id);
-
         if (session != null || !create) {
+            trace("getSession(" + create + "): " + (session != null ? session.getId() : "null"));
+
             return session;
         }
 
@@ -464,6 +482,8 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         {
             setSessionIdCookie();
         }
+
+        trace("getSession(" + create + "): " + session.getId());
 
         return session;
     }
@@ -732,7 +752,7 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     private static native int getLocalPort(long req_ptr);
 
 
-    private MultiMap<String> getParameters()
+    public MultiMap<String> getParameters()
     {
         if (parameters != null) {
             return parameters;
@@ -759,6 +779,11 @@ public class Request implements HttpServletRequest, DynamicPathRequest
         }
 
         return parameters;
+    }
+
+    public void setParameters(MultiMap<String> p)
+    {
+        parameters = p;
     }
 
     @Override
@@ -874,6 +899,10 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     public RequestDispatcher getRequestDispatcher(String path)
     {
         trace("getRequestDispatcher: " + path);
+
+        if (path.startsWith("/")) {
+            return context.getRequestDispatcher(path);
+        }
 
         try {
             URI uri = new URI(getRequestURI());

@@ -147,8 +147,7 @@ public class Context implements ServletContext, InitParams
     private final List<PrefixPattern> prefix_patterns_ = new ArrayList<>();
     private final Map<String, ServletReg> suffix2servlet_ = new HashMap<>();
     private ServletReg default_servlet_;
-    private ServletReg system_default_servlet_ = new ServletReg("default",
-        new StaticServlet());
+    private ServletReg system_default_servlet_;
 
     private final List<String> welcome_files_ = new ArrayList<>();
 
@@ -246,7 +245,7 @@ public class Context implements ServletContext, InitParams
                 10.6 Web Application Archive File
                 ...
                 This directory [META-INF] must not be directly served as
-                content by the container in response to a Web client’s request,
+                content by the container in response to a Web client's request,
                 though its contents are visible to servlet code via the
                 getResource and getResourceAsStream calls on the
                 ServletContext. Also, any requests to access the resources in
@@ -267,6 +266,19 @@ public class Context implements ServletContext, InitParams
 
             File f = new File(webapp_, path);
             if (!f.exists()) {
+                if (request.getDispatcherType() == DispatcherType.INCLUDE) {
+                    /*
+                        9.3 The Include Method
+                        ...
+                        If the default servlet is the target of a
+                        RequestDispatch.include() and the requested resource
+                        does not exist, then the default servlet MUST throw
+                        FileNotFoundException.
+                     */
+
+                    throw new FileNotFoundException();
+                }
+
                 response.sendError(response.SC_NOT_FOUND);
                 return;
             }
@@ -332,6 +344,22 @@ public class Context implements ServletContext, InitParams
     public Context()
     {
         default_session_tracking_modes_.add(SessionTrackingMode.COOKIE);
+
+        context_path_ = System.getProperty("nginx.unit.context.path", "").trim();
+
+        if (context_path_.endsWith("/")) {
+            context_path_ = context_path_.substring(0, context_path_.length() - 1);
+        }
+
+        if (!context_path_.isEmpty() && !context_path_.startsWith("/")) {
+            context_path_ = "/" + context_path_;
+        }
+
+        if (context_path_.isEmpty()) {
+            session_cookie_config_.setPath("/");
+        } else {
+            session_cookie_config_.setPath(context_path_);
+        }
     }
 
     public void loadApp(String webapp, URL[] classpaths)
@@ -381,6 +409,11 @@ public class Context implements ServletContext, InitParams
             trace("archives: " + urls[i]);
         }
 
+        String custom_listener = System.getProperty("nginx.unit.context.listener", "").trim();
+        if (!custom_listener.isEmpty()) {
+            pending_listener_classnames_.add(custom_listener);
+        }
+
         processWebXml(root);
 
         loader_ = new AppClassLoader(urls,
@@ -427,17 +460,38 @@ public class Context implements ServletContext, InitParams
                 welcome_files_.add("index.jsp");
             }
 
-            if (pattern2servlet_.get("*.jsp") == null) {
-                ServletReg jsp_servlet = new JspServletReg();
+            ServletReg jsp_servlet = name2servlet_.get("jsp");
+            if (jsp_servlet == null) {
+                jsp_servlet = new ServletReg("jsp", JspServlet.class);
+                jsp_servlet.system_jsp_servlet_ = true;
                 servlets_.add(jsp_servlet);
+                name2servlet_.put("jsp", jsp_servlet);
+            }
 
+            if (jsp_servlet.getClassName() == null) {
+                jsp_servlet.setClass(JspServlet.class);
+                jsp_servlet.system_jsp_servlet_ = true;
+            }
+
+            if (jsp_servlet.patterns_.isEmpty()) {
                 parseURLPattern("*.jsp", jsp_servlet);
                 parseURLPattern("*.jspx", jsp_servlet);
             }
 
-            if (!name2servlet_.containsKey("default")) {
-                name2servlet_.put("default", system_default_servlet_);
+            ServletReg def_servlet = name2servlet_.get("default");
+            if (def_servlet == null) {
+                def_servlet = new ServletReg("default", new StaticServlet());
+                def_servlet.servlet_ = new StaticServlet();
+                servlets_.add(def_servlet);
+                name2servlet_.put("default", def_servlet);
             }
+
+            if (def_servlet.getClassName() == null) {
+                def_servlet.setClass(StaticServlet.class);
+                def_servlet.servlet_ = new StaticServlet();
+            }
+
+            system_default_servlet_ = def_servlet;
 
             for (PrefixPattern p : prefix_patterns_) {
                 /*
@@ -624,9 +678,42 @@ public class Context implements ServletContext, InitParams
         private final ServletReg servlet_;
         private final List<FilterReg> filters_;
 
-        CtxFilterChain(ServletReg servlet, List<FilterReg> filters)
+        CtxFilterChain(ServletReg servlet, String path, DispatcherType dtype)
         {
             servlet_ = servlet;
+
+            List<FilterReg> filters = new ArrayList<>();
+
+            for (FilterMap m : filter_maps_) {
+                if (filters.indexOf(m.filter_) != -1) {
+                    continue;
+                }
+
+                if (!m.dtypes_.contains(dtype)) {
+                    continue;
+                }
+
+                if (m.pattern_.match(path)) {
+                    filters.add(m.filter_);
+
+                    trace("add filter (matched): " + m.filter_.getName());
+                }
+            }
+
+            for (FilterMap m : servlet.filters_) {
+                if (filters.indexOf(m.filter_) != -1) {
+                    continue;
+                }
+
+                if (!m.dtypes_.contains(dtype)) {
+                    continue;
+                }
+
+                filters.add(m.filter_);
+
+                trace("add filter (servlet): " + m.filter_.getName());
+            }
+
             filters_ = filters;
         }
 
@@ -646,12 +733,6 @@ public class Context implements ServletContext, InitParams
 
     private ServletReg findServlet(String path, DynamicPathRequest req)
     {
-        if (!path.startsWith(context_path_)) {
-            trace("findServlet: '" + path + "' not started with '" + context_path_ + "'");
-            return null;
-        }
-        path = path.substring(context_path_.length());
-
         /*
             12.1 Use of URL Paths
             ...
@@ -677,9 +758,9 @@ public class Context implements ServletContext, InitParams
                 trace("findServlet: '" + path + "' matched prefix pattern '" + p.pattern + "'");
                 if (p.pattern.length() == path.length()) {
                     log("findServlet: WARNING: it is expected '" + path + "' exactly matches " + p.pattern);
-                    req.setServletPath(p.pattern, null);
+                    req.setServletPath(path, p.pattern, null);
                 } else {
-                    req.setServletPath(p.pattern, path.substring(p.pattern.length()));
+                    req.setServletPath(path, p.pattern, path.substring(p.pattern.length()));
                 }
                 return p.servlet;
             }
@@ -774,12 +855,6 @@ public class Context implements ServletContext, InitParams
             }
         }
 
-        File dir = new File(webapp_, path.substring(1));
-        if (!dir.exists()) {
-            trace("findServlet: file " + dir + " is not exists");
-            return null;
-        }
-
         trace("findServlet: '" + path + "' fallback to system default servlet");
         req.setServletPath(path, null);
 
@@ -816,7 +891,7 @@ public class Context implements ServletContext, InitParams
             presence here. Otherwise user will get 404.
          */
 
-        if (servlet instanceof JspServletReg && !exists) {
+        if (servlet.system_jsp_servlet_ && !exists) {
             trace("findWelcomeServlet: '" + path + "' not exists");
             return null;
         }
@@ -844,36 +919,34 @@ public class Context implements ServletContext, InitParams
             }
 
             URI uri = new URI(req.getRequestURI());
-            ServletReg servlet = findServlet(uri.getPath(), req);
+            String path = uri.getPath();
 
-            if (servlet == null) {
+            if (!path.startsWith(context_path_)
+                || (path.length() > context_path_.length()
+                    && path.charAt(context_path_.length()) != '/'))
+            {
+                trace("service: '" + path + "' not started with '" + context_path_ + "'");
+
                 resp.sendError(resp.SC_NOT_FOUND);
-
-            } else {
-                List<FilterReg> filters = new ArrayList<>();
-
-                for (FilterMap m : filter_maps_) {
-                    if (filters.indexOf(m.filter_) != -1) {
-                        continue;
-                    }
-
-                    if (m.pattern_.match(uri.getPath())) {
-                        filters.add(m.filter_);
-                    }
-                }
-
-                for (FilterMap m : servlet.filters_) {
-                    if (filters.indexOf(m.filter_) != -1) {
-                        continue;
-                    }
-
-                    filters.add(m.filter_);
-                }
-
-                FilterChain fc = new CtxFilterChain(servlet, filters);
-
-                fc.doFilter(req, resp);
+                return;
             }
+
+            if (path.equals(context_path_)) {
+                String url = req.getRequestURL().toString();
+                if (!url.endsWith("/")) {
+                    resp.setHeader("Location", url + "/");
+                    resp.sendError(resp.SC_FOUND);
+                    return;
+                }
+            }
+
+            path = path.substring(context_path_.length());
+
+            ServletReg servlet = findServlet(path, req);
+
+            FilterChain fc = new CtxFilterChain(servlet, req.getFilterPath(), DispatcherType.REQUEST);
+
+            fc.doFilter(req, resp);
 
             Object code = req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
             if (code != null && code instanceof Integer) {
@@ -970,27 +1043,32 @@ public class Context implements ServletContext, InitParams
         try {
             log("handleError: " + location);
 
+            String filter_path = req.getFilterPath();
             String servlet_path = req.getServletPath();
             String path_info = req.getPathInfo();
             String req_uri = req.getRequestURI();
             DispatcherType dtype = req.getDispatcherType();
 
-            URI uri = new URI(req_uri);
-            uri = uri.resolve(location);
+            URI uri;
+
+            if (location.startsWith("/")) {
+                uri = new URI(context_path_ + location);
+            } else {
+                uri = new URI(req_uri).resolve(location);
+            }
 
             req.setRequestURI(uri.getRawPath());
             req.setDispatcherType(DispatcherType.ERROR);
 
-            ServletReg servlet = findServlet(uri.getPath(), req);
+            String path = uri.getPath().substring(context_path_.length());
 
-            if (servlet == null) {
-                resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+            ServletReg servlet = findServlet(path, req);
 
-            } else {
-                servlet.service(req, resp);
-            }
+            FilterChain fc = new CtxFilterChain(servlet, req.getFilterPath(), DispatcherType.ERROR);
 
-            req.setServletPath(servlet_path, path_info);
+            fc.doFilter(req, resp);
+
+            req.setServletPath(filter_path, servlet_path, path_info);
             req.setRequestURI(req_uri);
             req.setDispatcherType(dtype);
         } catch (URISyntaxException e) {
@@ -1763,6 +1841,7 @@ public class Context implements ServletContext, InitParams
         private int load_on_startup_ = -1;
         private boolean initialized_ = false;
         private final List<FilterMap> filters_ = new ArrayList<>();
+        private boolean system_jsp_servlet_ = false;
 
         public ServletReg(String name, Class<?> servlet_class)
         {
@@ -1792,18 +1871,15 @@ public class Context implements ServletContext, InitParams
                 return;
             }
 
-            init_servlet();
+            trace("ServletReg.init(): " + getName());
 
-            servlet_.init((ServletConfig) this);
+            if (system_jsp_servlet_) {
+                JasperInitializer ji = new JasperInitializer();
 
-            initialized_ = true;
-        }
+                ji.onStartup(Collections.emptySet(), Context.this);
+            }
 
-        protected void init_servlet() throws ServletException
-        {
             if (servlet_ == null) {
-                trace("ServletReg.init(): " + getName());
-
                 try {
                     if (servlet_class_ == null) {
                         servlet_class_ = loader_.loadClass(getClassName());
@@ -1816,6 +1892,10 @@ public class Context implements ServletContext, InitParams
                     throw new ServletException(e);
                 }
             }
+
+            servlet_.init((ServletConfig) this);
+
+            initialized_ = true;
         }
 
         public void startup() throws ServletException
@@ -1964,24 +2044,6 @@ public class Context implements ServletContext, InitParams
         public ServletContext getServletContext()
         {
             return (ServletContext) Context.this;
-        }
-    }
-
-    private class JspServletReg extends ServletReg
-    {
-        public JspServletReg() throws ClassNotFoundException
-        {
-            super("jsp", JspServlet.class);
-        }
-
-        @Override
-        protected void init_servlet() throws ServletException
-        {
-            JasperInitializer ji = new JasperInitializer();
-
-            ji.onStartup(Collections.emptySet(), Context.this);
-
-            super.init_servlet();
         }
     }
 
@@ -2432,14 +2494,9 @@ public class Context implements ServletContext, InitParams
             try {
                 trace("URIRequestDispatcher.forward");
 
-                ServletReg servlet = findServlet(uri_.getPath(), req);
+                String path = uri_.getPath().substring(context_path_.length());
 
-                if (servlet == null) {
-                    HttpServletResponse resp = (HttpServletResponse) response;
-                    resp.sendError(HttpServletResponse.SC_NOT_FOUND);
-
-                    return;
-                }
+                ServletReg servlet = findServlet(path, req);
 
                 req.setRequestURI(uri_.getRawPath());
                 req.setQueryString(uri_.getRawQuery());
@@ -2450,11 +2507,13 @@ public class Context implements ServletContext, InitParams
                     ...
                     If output data exists in the response buffer that has not
                     been committed, the content must be cleared before the
-                    target servlet’s service method is called.
+                    target servlet's service method is called.
                  */
                 response.resetBuffer();
 
-                servlet.service(request, response);
+                FilterChain fc = new CtxFilterChain(servlet, req.getFilterPath(), DispatcherType.FORWARD);
+
+                fc.doFilter(request, response);
 
                 /*
                     9.4 The Forward Method
@@ -2504,26 +2563,17 @@ public class Context implements ServletContext, InitParams
             try {
                 trace("URIRequestDispatcher.include");
 
-                ServletReg servlet = findServlet(uri_.getPath(), req);
+                String path = uri_.getPath().substring(context_path_.length());
 
-                if (servlet == null) {
-                    /*
-                        9.3 The Include Method
-                        ...
-                        If the default servlet is the target of a
-                        RequestDispatch.include() and the requested resource
-                        does not exist, then the default servlet MUST throw
-                        FileNotFoundException.
-                     */
-
-                    throw new FileNotFoundException();
-                }
+                ServletReg servlet = findServlet(path, req);
 
                 req.setRequestURI(uri_.getRawPath());
                 req.setQueryString(uri_.getRawQuery());
                 req.setDispatcherType(DispatcherType.INCLUDE);
 
-                servlet.service(request, response);
+                FilterChain fc = new CtxFilterChain(servlet, req.getFilterPath(), DispatcherType.INCLUDE);
+
+                fc.doFilter(request, new IncludeResponseWrapper(response));
 
             } catch (ServletException e) {
                 throw e;
@@ -2581,7 +2631,7 @@ public class Context implements ServletContext, InitParams
                     ...
                     If output data exists in the response buffer that has not
                     been committed, the content must be cleared before the
-                    target servlet’s service method is called.
+                    target servlet's service method is called.
                  */
                 response.resetBuffer();
 
@@ -2644,7 +2694,7 @@ public class Context implements ServletContext, InitParams
             try {
                 req.setDispatcherType(DispatcherType.INCLUDE);
 
-                servlet_.service(request, response);
+                servlet_.service(request, new IncludeResponseWrapper(response));
 
             } catch (ServletException e) {
                 throw e;
@@ -2850,7 +2900,7 @@ public class Context implements ServletContext, InitParams
     @Override
     public String getContextPath()
     {
-        log("getContextPath");
+        trace("getContextPath");
         return context_path_;
     }
 

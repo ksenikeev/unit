@@ -16,6 +16,8 @@ public class IncludeRequestWrapper implements DynamicPathRequest
 
     private final DispatcherType orig_dtype;
 
+    private String filter_path_;
+
     public IncludeRequestWrapper(ServletRequest request)
     {
         if (request instanceof Request) {
@@ -31,6 +33,8 @@ public class IncludeRequestWrapper implements DynamicPathRequest
         orig_query_string_attr = request_.getAttribute(RequestDispatcher.INCLUDE_QUERY_STRING);
 
         orig_dtype = request_.getDispatcherType();
+
+        request_.setAttribute_(RequestDispatcher.INCLUDE_CONTEXT_PATH, request_.getContextPath());
     }
 
     @Override
@@ -42,8 +46,15 @@ public class IncludeRequestWrapper implements DynamicPathRequest
     @Override
     public void setServletPath(String servlet_path, String path_info)
     {
+        setServletPath(servlet_path, servlet_path, path_info);
+    }
+
+    @Override
+    public void setServletPath(String filter_path, String servlet_path, String path_info)
+    {
         request_.setAttribute_(RequestDispatcher.INCLUDE_SERVLET_PATH, servlet_path);
         request_.setAttribute_(RequestDispatcher.INCLUDE_PATH_INFO, path_info);
+        filter_path_ = filter_path;
     }
 
     @Override
@@ -56,6 +67,12 @@ public class IncludeRequestWrapper implements DynamicPathRequest
     public void setQueryString(String query)
     {
         request_.setAttribute_(RequestDispatcher.INCLUDE_QUERY_STRING, query);
+    }
+
+    @Override
+    public String getFilterPath()
+    {
+        return filter_path_;
     }
 
     public void close()

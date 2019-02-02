@@ -7,6 +7,9 @@ import java.io.PrintWriter;
 import java.lang.IllegalArgumentException;
 import java.lang.String;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -36,6 +39,7 @@ public class Response implements HttpServletResponse {
     private static final String defaultCharacterEncoding = "iso-8859-1";
     private String characterEncoding = defaultCharacterEncoding;
     private String contentType = null;
+    private String contentTypeHeader = null;
 
     private static final Charset ISO_8859_1 = StandardCharsets.ISO_8859_1;
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -153,7 +157,7 @@ public class Response implements HttpServletResponse {
             throw new IllegalArgumentException("Cookie.name cannot be blank/null");
         }
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -202,7 +206,7 @@ public class Response implements HttpServletResponse {
     {
         trace("addDateHeader: " + name + ": " + date);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -229,7 +233,12 @@ public class Response implements HttpServletResponse {
             return;
         }
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
+            return;
+        }
+
+        if (CONTENT_TYPE.equalsIgnoreCase(name)) {
+            setContentType(value);
             return;
         }
 
@@ -245,7 +254,7 @@ public class Response implements HttpServletResponse {
     {
         trace("addIntHeader: " + name + ": " + value);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -383,9 +392,13 @@ public class Response implements HttpServletResponse {
 */
         }
 
+/*
+        Avoid commit and give chance for error handlers.
+
         if (!request.isAsyncStarted()) {
             commit();
         }
+*/
     }
 
     private static native Request getRequest(long req_info_ptr);
@@ -411,11 +424,23 @@ public class Response implements HttpServletResponse {
     {
         trace("sendRedirect: " + location);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
-        /* TODO resolve relative URL to absolute */
+        try {
+            URI uri = new URI(location);
+
+            if (!uri.isAbsolute()) {
+                URI req_uri = new URI(getRequest(req_info_ptr).getRequestURL().toString());
+                uri = req_uri.resolve(uri);
+
+                location = uri.toString();
+            }
+        } catch (URISyntaxException e) {
+            log("sendRedirect: failed to send redirect: " + e);
+            return;
+        }
 
         sendRedirect(req_info_ptr, location.getBytes(ISO_8859_1));
     }
@@ -428,7 +453,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setDateHeader: " + name + ": " + date);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -444,7 +469,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setHeader: " + name + ": " + value);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -476,7 +501,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setIntHeader: " + name + ": " + value);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -491,7 +516,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setStatus: " + sc);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -507,7 +532,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setStatus: " + sc + "; " + sm);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -551,9 +576,13 @@ public class Response implements HttpServletResponse {
     @Override
     public String getContentType()
     {
-        trace("getContentType");
+        /* In JIRA decorator get content type called after commit. */
 
-        return getContentType(req_info_ptr);
+        String res = contentTypeHeader;
+
+        trace("getContentType: " + res);
+
+        return res;
     }
 
     private static native String getContentType(long req_info_ptr);
@@ -617,7 +646,7 @@ public class Response implements HttpServletResponse {
     {
         trace("reset");
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -657,7 +686,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setCharacterEncoding " + charset);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -684,6 +713,8 @@ public class Response implements HttpServletResponse {
         if (contentType != null) {
             String type = contentType + ";charset=" + characterEncoding;
 
+            contentTypeHeader = type;
+
             setContentType(req_info_ptr, type.getBytes(ISO_8859_1));
         }
     }
@@ -694,7 +725,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setContentLength: " + len);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -706,7 +737,7 @@ public class Response implements HttpServletResponse {
     {
         trace("setContentLengthLong: " + len);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
@@ -721,13 +752,14 @@ public class Response implements HttpServletResponse {
     {
         trace("setContentType: " + type);
 
-        if (isCommitted() || isIncluding()) {
+        if (isCommitted()) {
             return;
         }
 
         if (type == null) {
             removeContentType(req_info_ptr);
             contentType = null;
+            contentTypeHeader = null;
             return;
         }
 
@@ -750,6 +782,7 @@ public class Response implements HttpServletResponse {
         }
 
         contentType = ctype;
+        contentTypeHeader = type;
 
         setContentType(req_info_ptr, type.getBytes(ISO_8859_1));
     }
@@ -757,12 +790,6 @@ public class Response implements HttpServletResponse {
     private static native void setContentType(long req_info_ptr, byte[] type);
 
     private static native void removeContentType(long req_info_ptr);
-
-    public boolean isIncluding()
-    {
-        return getRequest(req_info_ptr).getDispatcherType()
-            == DispatcherType.INCLUDE;
-    }
 
 
     @Override

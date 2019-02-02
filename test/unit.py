@@ -338,7 +338,12 @@ class TestUnitHTTP(TestUnit):
                     headers['Content-Length'] = len(body)
 
             for header, value in headers.items():
-                req += header + ': ' + str(value) + crlf
+                if isinstance(value, list):
+                    for v in value:
+                        req += header + ': ' + str(v) + crlf
+
+                else:
+                    req += header + ': ' + str(value) + crlf
 
             req = (req + crlf).encode() + body
 
@@ -637,7 +642,8 @@ class TestUnitApplicationJava(TestUnitApplicationProto):
             if not os.path.isdir(classes_path):
                 os.makedirs(classes_path)
 
-            javac = ['javac', '-d', classes_path, '-classpath',
+            javac = ['javac', '-encoding', 'utf-8', '-d', classes_path,
+                '-classpath',
                 self.pardir + '/build/tomcat-servlet-api-9.0.13.jar']
             javac.extend(src)
 

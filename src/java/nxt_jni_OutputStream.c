@@ -194,6 +194,7 @@ nxt_java_OutputStream_write(JNIEnv *env, jclass cls, jlong req_info_ptr,
         buf->free += copy;
 
         len -= copy;
+        off += copy;
 
         if (buf->free - buf->start >= data->buf_size) {
             rc = nxt_java_OutputStream_flush_buf(env, req);
