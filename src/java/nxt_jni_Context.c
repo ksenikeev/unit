@@ -71,7 +71,8 @@ nxt_java_initContext(JNIEnv *env, jobject cl)
 
     res = (*env)->RegisterNatives(env, nxt_java_Context_class,
                                   context_methods,
-                                  sizeof(context_methods) / sizeof(context_methods[0]));
+                                  sizeof(context_methods)
+                                      / sizeof(context_methods[0]));
 
     nxt_unit_debug(NULL, "registered Context methods: %d", res);
 
@@ -91,7 +92,9 @@ failed:
 jobject
 nxt_java_startContext(JNIEnv *env, const char *webapp, jobject classpaths)
 {
-    jstring webapp_str = (*env)->NewStringUTF(env, webapp);
+    jstring webapp_str;
+
+    webapp_str = (*env)->NewStringUTF(env, webapp);
     if (webapp_str == NULL) {
         return NULL;
     }
@@ -118,7 +121,9 @@ nxt_java_Context_log(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
     jint msg_len)
 {
     const char      *msg_str;
-    nxt_unit_ctx_t  *ctx = (nxt_unit_ctx_t *) ctx_ptr;
+    nxt_unit_ctx_t  *ctx;
+
+    ctx = (nxt_unit_ctx_t *) ctx_ptr;
 
     msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
     if (msg_str == NULL) {
@@ -136,7 +141,9 @@ nxt_java_Context_trace(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
 {
 #if (NXT_DEBUG)
     const char      *msg_str;
-    nxt_unit_ctx_t  *ctx = (nxt_unit_ctx_t *) ctx_ptr;
+    nxt_unit_ctx_t  *ctx;
+
+    ctx = (nxt_unit_ctx_t *) ctx_ptr;
 
     msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
     if (msg_str == NULL) {

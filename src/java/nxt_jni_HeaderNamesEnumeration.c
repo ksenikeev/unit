@@ -59,7 +59,8 @@ nxt_java_initHeaderNamesEnumeration(JNIEnv *env, jobject cl)
 
     res = (*env)->RegisterNatives(env, nxt_java_HeaderNamesEnumeration_class,
                                   hnenum_methods,
-                                  sizeof(hnenum_methods) / sizeof(hnenum_methods[0]));
+                                  sizeof(hnenum_methods)
+                                      / sizeof(hnenum_methods[0]));
 
     nxt_unit_debug(NULL, "registered HeaderNamesEnumeration methods: %d", res);
 
