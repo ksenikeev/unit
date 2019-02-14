@@ -59,35 +59,10 @@ typedef struct {
 static nxt_int_t
 nxt_java_pre_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 {
-    char       *modules, *slash;
-    nxt_int_t  modules_len;
-
-    modules = (char *) task->thread->runtime->modules;
-
-    slash = strrchr(modules, '/');
-    if (slash != NULL) {
-        modules_len = slash - modules;
-
-        modules = nxt_malloc(modules_len + 1);
-        if (modules == NULL) {
-            return NXT_ERROR;
-        }
-
-        memcpy(modules, task->thread->runtime->modules, modules_len);
-        modules[modules_len] = '\0';
-
-    } else {
-        modules_len = nxt_strlen(modules);
-    }
-
-    nxt_java_modules = realpath(modules, NULL);
+    nxt_java_modules = realpath(NXT_JARS, NULL);
     if (nxt_java_modules == NULL) {
-        nxt_alert(task, "realpath(%s) failed: %E", modules, nxt_errno);
+        nxt_alert(task, "realpath(%s) failed: %E", NXT_JARS, nxt_errno);
         return NXT_ERROR;
-    }
-
-    if (slash != NULL) {
-        free(modules);
     }
 
     return NXT_OK;
