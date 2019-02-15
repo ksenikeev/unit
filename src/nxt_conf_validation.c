@@ -376,6 +376,11 @@ static nxt_conf_vldt_object_t  nxt_conf_vldt_java_members[] = {
       &nxt_conf_vldt_array_iterator,
       (void *) &nxt_conf_vldt_java_option},
 
+    { nxt_string("unit_jars"),
+      NXT_CONF_VLDT_STRING,
+      NULL,
+      NULL },
+
     NXT_CONF_VLDT_NEXT(&nxt_conf_vldt_common_members)
 };
 

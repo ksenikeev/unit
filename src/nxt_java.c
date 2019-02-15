@@ -59,7 +59,14 @@ typedef struct {
 static nxt_int_t
 nxt_java_pre_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 {
-    nxt_java_modules = realpath(NXT_JARS, NULL);
+    const char  *unit_jars;
+
+    unit_jars = conf->u.java.unit_jars;
+    if (unit_jars == NULL) {
+        unit_jars = NXT_JARS;
+    }
+
+    nxt_java_modules = realpath(unit_jars, NULL);
     if (nxt_java_modules == NULL) {
         nxt_alert(task, "realpath(%s) failed: %E", NXT_JARS, nxt_errno);
         return NXT_ERROR;

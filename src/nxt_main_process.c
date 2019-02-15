@@ -232,6 +232,11 @@ static nxt_conf_map_t  nxt_java_app_conf[] = {
         NXT_CONF_MAP_PTR,
         offsetof(nxt_common_app_conf_t, u.java.options),
     },
+    {
+        nxt_string("unit_jars"),
+        NXT_CONF_MAP_CSTRZ,
+        offsetof(nxt_common_app_conf_t, u.java.unit_jars),
+    },
 
 };
 
