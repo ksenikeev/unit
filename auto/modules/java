@@ -209,11 +209,11 @@ if grep ^$NXT_JAVA_MODULE: $NXT_MAKEFILE 2>&1 > /dev/null; then
 fi
 
 NXT_UNIT_JAR_VERSION=`grep 'define NXT_VERSION' src/nxt_main.h | sed -e 's/^.*"\(.*\)".*/\1/'`
-NXT_UNIT_JAR=nginx-unit-jsc-$NXT_UNIT_JAR_VERSION.jar
+NXT_UNIT_JAR=nginx-unit-jsc-${NXT_JAVA_MODULE}-$NXT_UNIT_JAR_VERSION.jar
 
 NXT_JAVA_BUILD_CP=$NXT_BUILD_DIR/$NXT_JAVA_MODULE
-NXT_JAVA_INSTALL_JARS=$NXT_BUILD_DIR/$NXT_UNIT_JAR
-NXT_JAVA_UNINSTALL_JARS="\$(DESTDIR)$NXT_JARS/$NXT_UNIT_JAR"
+NXT_JAVA_INSTALL_JARS=
+NXT_JAVA_UNINSTALL_JARS=
 
 NXT_JAVA_JARS=$NXT_BUILD_DIR/$NXT_JAVA_MODULE/nxt_jars.h
 mkdir -p $NXT_BUILD_DIR/$NXT_JAVA_MODULE
@@ -384,20 +384,20 @@ $NXT_BUILD_DIR/${NXT_JAVA_MODULE}.unit.so: $nxt_objs
 install: ${NXT_JAVA_MODULE}-install
 
 ${NXT_JAVA_MODULE}-install: $NXT_BUILD_DIR/${NXT_JAVA_MODULE}.unit.so \\
-    $NXT_JAVA_INSTALL_JARS
+    $NXT_BUILD_DIR/$NXT_UNIT_JAR java-shared-install
 	install -d \$(DESTDIR)$NXT_MODULES
 	install -p $NXT_BUILD_DIR/${NXT_JAVA_MODULE}.unit.so \\
 		\$(DESTDIR)$NXT_MODULES/
 	install -d \$(DESTDIR)$NXT_JARS
-	install -p -m 0644 $NXT_JAVA_INSTALL_JARS \$(DESTDIR)$NXT_JARS/
+	install -p -m 0644 $NXT_BUILD_DIR/$NXT_UNIT_JAR \$(DESTDIR)$NXT_JARS/
 
 
 uninstall: ${NXT_JAVA_MODULE}-uninstall
 
-${NXT_JAVA_MODULE}-uninstall:
+${NXT_JAVA_MODULE}-uninstall: java-shared-uninstall
 	rm -f \$(DESTDIR)$NXT_MODULES/${NXT_JAVA_MODULE}.unit.so
 	@rmdir -p \$(DESTDIR)$NXT_MODULES 2>/dev/null || true
-	rm -f $NXT_JAVA_UNINSTALL_JARS
+	rm -f \$(DESTDIR)$NXT_JARS/$NXT_UNIT_JAR
 	@rmdir -p \$(DESTDIR)$NXT_JARS 2>/dev/null || true
 
 END
@@ -417,6 +417,25 @@ $NXT_BUILD_DIR/$NXT_JAVA_MODULE/.classes: \$(NXT_JAVA_SRCS)
 
 $NXT_BUILD_DIR/$NXT_UNIT_JAR: $NXT_BUILD_DIR/$NXT_JAVA_MODULE/.classes
 	$NXT_JAVA_HOME/bin/jar c -C $NXT_BUILD_DIR/$NXT_JAVA_MODULE nginx/unit > \$@
+
+END
+
+fi
+
+if ! grep ^java-shared-install: $NXT_MAKEFILE 2>&1 > /dev/null; then
+
+    cat << END >> $NXT_MAKEFILE
+
+.PHONY: java-shared-install
+.PHONY: java-shared-uninstall
+
+java-shared-install: $NXT_JAVA_INSTALL_JARS
+	install -d \$(DESTDIR)$NXT_JARS
+	install -p -m 0644 $NXT_JAVA_INSTALL_JARS \$(DESTDIR)$NXT_JARS/
+
+java-shared-uninstall:
+	rm -f $NXT_JAVA_UNINSTALL_JARS
+	@rmdir -p \$(DESTDIR)$NXT_JARS 2>/dev/null || true
 
 END
 
