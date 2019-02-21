@@ -60,7 +60,6 @@ nxt_java_initURLClassLoader(JNIEnv *env)
         goto failed;
     }
 
-
     cls = (*env)->FindClass(env, "java/net/URL");
     if (cls == NULL) {
         nxt_unit_warn(NULL, "java.net.URL not found");
@@ -89,8 +88,9 @@ failed:
 jobject
 nxt_java_newURLClassLoader(JNIEnv *env, int url_count, char **urls)
 {
-    jobjectArray jurls = nxt_java_newURLs(env, url_count, urls);
+    jobjectArray  jurls;
 
+    jurls = nxt_java_newURLs(env, url_count, urls);
     if (jurls == NULL) {
         return NULL;
     }
@@ -103,8 +103,9 @@ jobject
 nxt_java_newURLClassLoader_parent(JNIEnv *env, int url_count, char **urls,
     jobject parent)
 {
-    jobjectArray jurls = nxt_java_newURLs(env, url_count, urls);
+    jobjectArray  jurls;
 
+    jurls = nxt_java_newURLs(env, url_count, urls);
     if (jurls == NULL) {
         return NULL;
     }
@@ -117,21 +118,24 @@ nxt_java_newURLClassLoader_parent(JNIEnv *env, int url_count, char **urls,
 jobjectArray
 nxt_java_newURLs(JNIEnv *env, int url_count, char **urls)
 {
-    int i;
-    jobjectArray jurls = (*env)->NewObjectArray(env, url_count,
-                                                nxt_java_URL_class, NULL);
+    int           i;
+    jstring       surl;
+    jobject       jurl;
+    jobjectArray  jurls;
+
+    jurls = (*env)->NewObjectArray(env, url_count, nxt_java_URL_class, NULL);
     if (jurls == NULL) {
         return NULL;
     }
 
     for (i = 0; i < url_count; i++) {
-        jstring surl = (*env)->NewStringUTF(env, urls[i]);
+        surl = (*env)->NewStringUTF(env, urls[i]);
         if (surl == NULL) {
             return NULL;
         }
 
-        jobject jurl = (*env)->NewObject(env, nxt_java_URL_class,
-                                         nxt_java_URL_ctor, surl);
+        jurl = (*env)->NewObject(env, nxt_java_URL_class, nxt_java_URL_ctor,
+                                 surl);
         if (jurl == NULL) {
             return NULL;
         }
@@ -145,7 +149,9 @@ nxt_java_newURLs(JNIEnv *env, int url_count, char **urls)
 jclass
 nxt_java_loadClass(JNIEnv *env, jobject cl, const char *name)
 {
-    jstring jname = (*env)->NewStringUTF(env, name);
+    jstring  jname;
+
+    jname = (*env)->NewStringUTF(env, name);
     if (jname == NULL) {
         return NULL;
     }
@@ -157,13 +163,15 @@ nxt_java_loadClass(JNIEnv *env, jobject cl, const char *name)
 void
 nxt_java_addURL(JNIEnv *env, jobject cl, const char *url)
 {
-    jstring surl = (*env)->NewStringUTF(env, url);
+    jstring  surl;
+    jobject  jurl;
+
+    surl = (*env)->NewStringUTF(env, url);
     if (surl == NULL) {
         return;
     }
 
-    jobject jurl = (*env)->NewObject(env, nxt_java_URL_class,
-                                     nxt_java_URL_ctor, surl);
+    jurl = (*env)->NewObject(env, nxt_java_URL_class, nxt_java_URL_ctor, surl);
     if (jurl == NULL) {
         return;
     }

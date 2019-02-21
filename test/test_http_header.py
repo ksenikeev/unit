@@ -145,22 +145,50 @@ Connection: close
 
         self.assertEqual(resp['status'], 400, 'field trailing htab')
 
-    @unittest.expectedFailure
-    def test_http_header_transfer_encoding_chunked(self):
+    def test_http_header_content_length_big(self):
         self.load('empty')
 
-        resp = self.http(b"""GET / HTTP/1.1
-Host: localhost
-Transfer-Encoding: chunked
-Connection: close
+        self.assertEqual(self.post(headers={
+            'Content-Length': str(2 ** 64),
+            'Connection': 'close',
+            'Host': 'localhost'
+        }, body='X' * 1000)['status'], 400, 'Content-Length big')
 
-a
-0123456789
-0
+    def test_http_header_content_length_negative(self):
+        self.load('empty')
 
-""", raw=True)
+        self.assertEqual(self.post(headers={
+            'Content-Length': '-100',
+            'Connection': 'close',
+            'Host': 'localhost'
+        }, body='X' * 1000)['status'], 400, 'Content-Length negative')
 
-        self.assertEqual(resp['status'], 200, 'transfer encoding chunked')
+    def test_http_header_content_length_text(self):
+        self.load('empty')
+
+        self.assertEqual(self.post(headers={
+            'Content-Length': 'blah',
+            'Connection': 'close',
+            'Host': 'localhost'
+        }, body='X' * 1000)['status'], 400, 'Content-Length text')
+
+    def test_http_header_content_length_multiple_values(self):
+        self.load('empty')
+
+        self.assertEqual(self.post(headers={
+            'Content-Length': '41, 42',
+            'Connection': 'close',
+            'Host': 'localhost'
+        }, body='X' * 1000)['status'], 400, 'Content-Length multiple value')
+
+    def test_http_header_content_length_multiple_fields(self):
+        self.load('empty')
+
+        self.assertEqual(self.post(headers={
+            'Content-Length': ['41', '42'],
+            'Connection': 'close',
+            'Host': 'localhost'
+        }, body='X' * 1000)['status'], 400, 'Content-Length multiple fields')
 
 if __name__ == '__main__':
     TestUnitHTTPHeader.main()

@@ -38,14 +38,16 @@ nxt_java_initThread(JNIEnv *env)
     nxt_java_Thread_getContextClassLoader = (*env)->GetMethodID(env, cls,
         "getContextClassLoader", "()Ljava/lang/ClassLoader;");
     if (nxt_java_Thread_getContextClassLoader == NULL) {
-        nxt_unit_warn(NULL, "java.lang.Thread.getContextClassLoader() not found");
+        nxt_unit_warn(NULL, "java.lang.Thread.getContextClassLoader() "
+                      "not found");
         goto failed;
     }
 
     nxt_java_Thread_setContextClassLoader = (*env)->GetMethodID(env, cls,
         "setContextClassLoader", "(Ljava/lang/ClassLoader;)V");
     if (nxt_java_Thread_setContextClassLoader == NULL) {
-        nxt_unit_warn(NULL, "java.lang.Thread.setContextClassLoader() not found");
+        nxt_unit_warn(NULL, "java.lang.Thread.setContextClassLoader() "
+                      "not found");
         goto failed;
     }
 
@@ -63,7 +65,7 @@ nxt_java_setContextClassLoader(JNIEnv *env, jobject cl)
     jobject thread;
 
     thread = (*env)->CallStaticObjectMethod(env, nxt_java_Thread_class,
-        nxt_java_Thread_currentThread);
+                                            nxt_java_Thread_currentThread);
 
     if (thread == NULL) {
         return;
@@ -79,11 +81,12 @@ nxt_java_getContextClassLoader(JNIEnv *env)
     jobject thread;
 
     thread = (*env)->CallStaticObjectMethod(env, nxt_java_Thread_class,
-        nxt_java_Thread_currentThread);
+                                            nxt_java_Thread_currentThread);
 
     if (thread == NULL) {
         return NULL;
     }
 
-    return (*env)->CallObjectMethod(env, thread, nxt_java_Thread_getContextClassLoader);
+    return (*env)->CallObjectMethod(env, thread,
+                                    nxt_java_Thread_getContextClassLoader);
 }

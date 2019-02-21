@@ -485,7 +485,9 @@ nxt_java_Request_getLocalPort(JNIEnv *env, jclass cls, jlong req_ptr)
 static jstring JNICALL
 nxt_java_Request_getProtocol(JNIEnv *env, jclass cls, jlong req_ptr)
 {
-    nxt_unit_request_t  *r = (nxt_unit_request_t *) req_ptr;
+    nxt_unit_request_t  *r;
+
+    r = (nxt_unit_request_t *) req_ptr;
 
     return (*env)->NewStringUTF(env, nxt_unit_sptr_get(&r->version));
 }
@@ -494,7 +496,9 @@ nxt_java_Request_getProtocol(JNIEnv *env, jclass cls, jlong req_ptr)
 static jstring JNICALL
 nxt_java_Request_getRemoteAddr(JNIEnv *env, jclass cls, jlong req_ptr)
 {
-    nxt_unit_request_t  *r = (nxt_unit_request_t *) req_ptr;
+    nxt_unit_request_t  *r;
+
+    r = (nxt_unit_request_t *) req_ptr;
 
     return nxt_java_newString(env, nxt_unit_sptr_get(&r->remote),
                               r->remote_length);
@@ -619,7 +623,9 @@ nxt_java_Request_log(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
     jint msg_len)
 {
     const char               *msg_str;
-    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
+    nxt_unit_request_info_t  *req;
+
+    req = (nxt_unit_request_info_t *) req_info_ptr;
 
     msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
     if (msg_str == NULL) {
@@ -637,7 +643,9 @@ nxt_java_Request_trace(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
 {
 #if (NXT_DEBUG)
     const char               *msg_str;
-    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
+    nxt_unit_request_info_t  *req;
+
+    req = (nxt_unit_request_info_t *) req_info_ptr;
 
     msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
     if (msg_str == NULL) {

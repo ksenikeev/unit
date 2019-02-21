@@ -85,8 +85,11 @@ nxt_java_OutputStream_writeByte(JNIEnv *env, jclass cls, jlong req_info_ptr,
     jint b)
 {
     nxt_unit_buf_t           *buf;
-    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
-    nxt_java_request_data_t  *data = req->data;
+    nxt_unit_request_info_t  *req;
+    nxt_java_request_data_t  *data;
+
+    req = (nxt_unit_request_info_t *) req_info_ptr;
+    data = req->data;
 
     buf = nxt_java_OutputStream_req_buf(env, req);
     if (buf == NULL) {
@@ -105,7 +108,9 @@ int
 nxt_java_OutputStream_flush_buf(JNIEnv *env, nxt_unit_request_info_t *req)
 {
     int                      rc;
-    nxt_java_request_data_t  *data = req->data;
+    nxt_java_request_data_t  *data;
+
+    data = req->data;
 
     if (!nxt_unit_response_is_init(req)) {
         rc = nxt_unit_response_init(req, 200, 0, 0);
@@ -147,8 +152,9 @@ nxt_java_OutputStream_req_buf(JNIEnv *env, nxt_unit_request_info_t *req)
 {
     uint32_t                 size;
     nxt_unit_buf_t           *buf;
-    nxt_java_request_data_t  *data = req->data;
+    nxt_java_request_data_t  *data;
 
+    data = req->data;
     buf = data->buf;
 
     if (buf == NULL || buf->free >= buf->end) {
@@ -176,8 +182,11 @@ nxt_java_OutputStream_write(JNIEnv *env, jclass cls, jlong req_info_ptr,
     jint                     copy;
     uint8_t                  *ptr;
     nxt_unit_buf_t           *buf;
-    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
-    nxt_java_request_data_t  *data = req->data;
+    nxt_unit_request_info_t  *req;
+    nxt_java_request_data_t  *data;
+
+    req = (nxt_unit_request_info_t *) req_info_ptr;
+    data = req->data;
 
     ptr = (*env)->GetPrimitiveArrayCritical(env, b, NULL);
 
@@ -211,8 +220,11 @@ nxt_java_OutputStream_write(JNIEnv *env, jclass cls, jlong req_info_ptr,
 static void JNICALL
 nxt_java_OutputStream_flush(JNIEnv *env, jclass cls, jlong req_info_ptr)
 {
-    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
-    nxt_java_request_data_t  *data = req->data;
+    nxt_unit_request_info_t  *req;
+    nxt_java_request_data_t  *data;
+
+    req = (nxt_unit_request_info_t *) req_info_ptr;
+    data = req->data;
 
     if (data->buf != NULL && data->buf->free > data->buf->start) {
         nxt_java_OutputStream_flush_buf(env, req);

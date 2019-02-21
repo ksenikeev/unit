@@ -75,6 +75,7 @@ typedef struct {
     nxt_conf_value_t           *classpath;
     char                       *webapp;
     nxt_conf_value_t           *options;
+    char                       *unit_jars;
 } nxt_java_app_conf_t;
 
 

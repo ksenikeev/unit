@@ -59,35 +59,17 @@ typedef struct {
 static nxt_int_t
 nxt_java_pre_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 {
-    char       *modules, *slash;
-    nxt_int_t  modules_len;
+    const char  *unit_jars;
 
-    modules = (char *) task->thread->runtime->modules;
-
-    slash = strrchr(modules, '/');
-    if (slash != NULL) {
-        modules_len = slash - modules;
-
-        modules = nxt_malloc(modules_len + 1);
-        if (modules == NULL) {
-            return NXT_ERROR;
-        }
-
-        memcpy(modules, task->thread->runtime->modules, modules_len);
-        modules[modules_len] = '\0';
-
-    } else {
-        modules_len = nxt_strlen(modules);
+    unit_jars = conf->u.java.unit_jars;
+    if (unit_jars == NULL) {
+        unit_jars = NXT_JARS;
     }
 
-    nxt_java_modules = realpath(modules, NULL);
+    nxt_java_modules = realpath(unit_jars, NULL);
     if (nxt_java_modules == NULL) {
-        nxt_alert(task, "realpath(%s) failed: %E", modules, nxt_errno);
+        nxt_alert(task, "realpath(%s) failed: %E", NXT_JARS, nxt_errno);
         return NXT_ERROR;
-    }
-
-    if (slash != NULL) {
-        free(modules);
     }
 
     return NXT_OK;
@@ -137,6 +119,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     char                 **classpath_arr, **unit_jars, **system_jars;
     JavaVM               *jvm;
     JNIEnv               *env;
+    jobject              cl, classpath;
     nxt_str_t            str;
     nxt_int_t            opt_len, real_path_len;
     nxt_uint_t           i, unit_jars_count, classpath_count, system_jars_count;
@@ -185,11 +168,6 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 
         return NXT_ERROR;
     }
-
-/*
-    jvm_opt[1].optionString = (char *) "-Xcheck:jni";
-    jvm_opt[2].optionString = (char *) "-verbose:jni";
-*/
 
     if (c->options != NULL) {
 
@@ -295,11 +273,11 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 
     rc = nxt_java_initURLClassLoader(env);
     if (rc != NXT_UNIT_OK) {
-        nxt_alert(task, "nxt_java_initThread() failed");
+        nxt_alert(task, "nxt_java_initURLClassLoader() failed");
         goto env_failed;
     }
 
-    jobject cl = nxt_java_newURLClassLoader(env, system_jars_count, system_jars);
+    cl = nxt_java_newURLClassLoader(env, system_jars_count, system_jars);
     if (cl == NULL) {
         nxt_alert(task, "nxt_java_newURLClassLoader failed");
         goto env_failed;
@@ -309,7 +287,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
 
     cl = nxt_java_newURLClassLoader_parent(env, unit_jars_count, unit_jars, cl);
     if (cl == NULL) {
-        nxt_alert(task, "nxt_java_newURLClassLoader failed");
+        nxt_alert(task, "nxt_java_newURLClassLoader_parent failed");
         goto env_failed;
     }
 
@@ -351,14 +329,14 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
         goto env_failed;
     }
 
-    jobject classpaths = nxt_java_newURLs(env, classpath_count, classpath_arr);
-    if (classpaths == NULL) {
+    classpath = nxt_java_newURLs(env, classpath_count, classpath_arr);
+    if (classpath == NULL) {
         nxt_alert(task, "nxt_java_newURLs failed");
         goto env_failed;
     }
 
     data.env = env;
-    data.ctx = nxt_java_startContext(env, c->webapp, classpaths);
+    data.ctx = nxt_java_startContext(env, c->webapp, classpath);
 
     if ((*env)->ExceptionCheck(env)) {
         nxt_alert(task, "Unhandled exception in application start");
@@ -410,12 +388,16 @@ env_failed:
 static void
 nxt_java_request_handler(nxt_unit_request_info_t *req)
 {
-    nxt_java_data_t          *java_data = req->unit->data;
-    JNIEnv                   *env = java_data->env;
-    nxt_java_request_data_t  *data = req->data;
+    JNIEnv                   *env;
+    jobject                  jreq, jresp;
+    nxt_java_data_t          *java_data;
+    nxt_java_request_data_t  *data;
 
-    jobject jreq = nxt_java_newRequest(env, java_data->ctx, req);
+    java_data = req->unit->data;
+    env = java_data->env;
+    data = req->data;
 
+    jreq = nxt_java_newRequest(env, java_data->ctx, req);
     if (jreq == NULL) {
         nxt_unit_req_alert(req, "failed to create Request instance");
 
@@ -428,8 +410,7 @@ nxt_java_request_handler(nxt_unit_request_info_t *req)
         return;
     }
 
-    jobject jresp = nxt_java_newResponse(env, req);
-
+    jresp = nxt_java_newResponse(env, req);
     if (jresp == NULL) {
         nxt_unit_req_alert(req, "failed to create Response instance");
 

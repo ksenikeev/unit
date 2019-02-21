@@ -179,7 +179,8 @@ class TestUnit(unittest.TestCase):
 
         self._started = True
 
-        self.skip_alerts = [r'read signalfd\(4\) failed']
+        self.skip_alerts = [r'read signalfd\(4\) failed', r'sendmsg.+failed',
+            r'recvmsg.+failed']
         self.skip_sanitizer = False
 
     def _stop(self):
@@ -235,7 +236,7 @@ class TestUnit(unittest.TestCase):
 
             if sanitizer_errors:
                 self._print_path_to_log()
-                self.assertFalse(sanitizer_error, 'sanitizer error(s)')
+                self.assertFalse(sanitizer_errors, 'sanitizer error(s)')
 
         if found:
             print('skipped.')
@@ -285,7 +286,6 @@ class TestUnitHTTP(TestUnit):
         port = 7080 if 'port' not in kwargs else kwargs['port']
         url = '/' if 'url' not in kwargs else kwargs['url']
         http = 'HTTP/1.0' if 'http_10' in kwargs else 'HTTP/1.1'
-        blocking = False if 'blocking' not in kwargs else kwargs['blocking']
 
         headers = ({
             'Host': 'localhost',
@@ -322,8 +322,6 @@ class TestUnitHTTP(TestUnit):
                 sock.close()
                 return None
 
-            sock.setblocking(blocking)
-
         else:
             sock = kwargs['sock']
 
@@ -358,8 +356,8 @@ class TestUnitHTTP(TestUnit):
         resp = ''
 
         if 'no_recv' not in kwargs:
-           enc = 'utf-8' if 'encoding' not in kwargs else kwargs['encoding']
-           resp = self.recvall(sock).decode(enc)
+            enc = 'utf-8' if 'encoding' not in kwargs else kwargs['encoding']
+            resp = self.recvall(sock).decode(enc)
 
         if TestUnit.detailed:
             print('<<<', resp.encode('utf-8'), sep='\n')
@@ -436,7 +434,7 @@ class TestUnitControl(TestUnitHTTP):
     # TODO http client
 
     def conf(self, conf, path='/config'):
-        if isinstance(conf, dict):
+        if isinstance(conf, dict) or isinstance(conf, list):
             conf = json.dumps(conf)
 
         if path[:1] != '/':
@@ -658,6 +656,7 @@ class TestUnitApplicationJava(TestUnitApplicationProto):
             },
             "applications": {
                 script: {
+                    "unit_jars": self.pardir + '/build',
                     "type": "java",
                     "processes": { "spare": 0 },
                     "working_directory": script_path,
@@ -710,11 +709,11 @@ class TestUnitApplicationTLS(TestUnitApplicationProto):
                 return self.conf(k.read() + c.read(), '/certificates/' + crt)
 
     def get_ssl(self, **kwargs):
-        return self.get(blocking=True, wrapper=self.context.wrap_socket,
+        return self.get(wrapper=self.context.wrap_socket,
             **kwargs)
 
     def post_ssl(self, **kwargs):
-        return self.post(blocking=True, wrapper=self.context.wrap_socket,
+        return self.post(wrapper=self.context.wrap_socket,
             **kwargs)
 
     def get_server_certificate(self, addr=('127.0.0.1', 7080)):

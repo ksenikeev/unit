@@ -235,7 +235,8 @@ nxt_java_initResponse(JNIEnv *env, jobject cl)
 
     res = (*env)->RegisterNatives(env, nxt_java_Response_class,
                                   resp_methods,
-                                  sizeof(resp_methods) / sizeof(resp_methods[0]));
+                                  sizeof(resp_methods)
+                                      / sizeof(resp_methods[0]));
 
     nxt_unit_debug(NULL, "registered Response methods: %d", res);
 
@@ -591,8 +592,11 @@ nxt_java_Response_getStatus(JNIEnv *env, jclass cls, jlong req_info_ptr)
 static jobject JNICALL
 nxt_java_Response_getRequest(JNIEnv *env, jclass cls, jlong req_info_ptr)
 {
-    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
-    nxt_java_request_data_t  *data = req->data;
+    nxt_unit_request_info_t  *req;
+    nxt_java_request_data_t  *data;
+
+    req = (nxt_unit_request_info_t *) req_info_ptr;
+    data = req->data;
 
     return data->jreq;
 }
@@ -601,7 +605,9 @@ nxt_java_Response_getRequest(JNIEnv *env, jclass cls, jlong req_info_ptr)
 static void JNICALL
 nxt_java_Response_commit(JNIEnv *env, jclass cls, jlong req_info_ptr)
 {
-    nxt_unit_request_info_t  *req = (nxt_unit_request_info_t *) req_info_ptr;
+    nxt_unit_request_info_t  *req;
+
+    req = (nxt_unit_request_info_t *) req_info_ptr;
 
     nxt_java_OutputStream_flush_buf(env, req);
 }

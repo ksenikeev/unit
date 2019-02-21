@@ -430,15 +430,24 @@ public class Context implements ServletContext, InitParams
             ScanResult scan_res = null;
 
             if (!metadata_complete_) {
-                scan_res = new ClassGraph()
+                ClassGraph classgraph = new ClassGraph()
                     //.verbose()
                     .overrideClassLoaders(loader_)
-                    //.ignoreParentClassLoaders()
+                    .ignoreParentClassLoaders()
                     .enableClassInfo()
                     .enableAnnotationInfo()
-                    .enableSystemPackages()
+                    //.enableSystemPackages()
+                    .whitelistModules("javax.*")
                     //.enableAllInfo()
-                    .scan();
+                    ;
+
+                String verbose = System.getProperty("nginx.unit.context.classgraph.verbose", "").trim();
+
+                if (verbose.equals("true")) {
+                    classgraph.verbose();
+                }
+
+                scan_res = classgraph.scan();
 
                 loadInitializers(scan_res);
             }
