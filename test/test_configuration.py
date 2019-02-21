@@ -132,7 +132,6 @@ class TestUnitConfiguration(unit.TestUnitControl):
         self.skip_sanitizer = True
         self.skip_alerts.extend([
             r'failed to apply previous configuration',
-            r'sendmsg.+failed',
             r'process \d+ exited on signal'
         ])
 
@@ -242,9 +241,10 @@ class TestUnitConfiguration(unit.TestUnitControl):
     def test_json_application_many(self):
         self.skip_alerts.extend([
             r'eventfd.+failed',
+            r'epoll_create.+failed',
             r'failed to apply new conf'
         ])
-        apps = 1000
+        apps = 999
 
         conf = {
             "applications":
@@ -256,7 +256,7 @@ class TestUnitConfiguration(unit.TestUnitControl):
                 } for a in range(apps)
             },
             "listeners": {
-                "*:" + str(7080 + a): {
+                "*:" + str(7000 + a): {
                     "application": "app-" + str(a)
                 } for a in range(apps)
             }

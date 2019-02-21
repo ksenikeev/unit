@@ -119,12 +119,12 @@ struct nxt_http_request_s {
     nxt_str_t                       *args;
 
     nxt_list_t                      *fields;
-    nxt_http_field_t                *host;
     nxt_http_field_t                *content_type;
     nxt_http_field_t                *content_length;
     nxt_http_field_t                *cookie;
     nxt_http_field_t                *referer;
     nxt_http_field_t                *user_agent;
+    nxt_str_t                       host;
     nxt_off_t                       content_length_n;
 
     nxt_sockaddr_t                  *remote;
@@ -176,7 +176,6 @@ nxt_buf_t *nxt_http_buf_mem(nxt_task_t *task, nxt_http_request_t *r,
     size_t size);
 nxt_buf_t *nxt_http_buf_last(nxt_http_request_t *r);
 void nxt_http_request_error_handler(nxt_task_t *task, void *obj, void *data);
-void nxt_http_request_close_handler(nxt_task_t *task, void *obj, void *data);
 
 nxt_int_t nxt_http_request_host(void *ctx, nxt_http_field_t *field,
     uintptr_t data);
