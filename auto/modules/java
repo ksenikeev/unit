@@ -82,7 +82,7 @@ else
     $echo -n "looking for java executable"
     $echo "looking for java executable ..." >> $NXT_AUTOCONF_ERR
 
-    NXT_JAVA=`which java`
+    NXT_JAVA=`which java || :`
     if [ -z "$NXT_JAVA" -o ! -x "$NXT_JAVA" ]; then
         $echo
         $echo $0: error: java executable not found.
