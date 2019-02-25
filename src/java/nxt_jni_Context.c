@@ -8,6 +8,7 @@
 #include <nxt_unit.h>
 #include <jni.h>
 
+#include "nxt_jni.h"
 #include "nxt_jni_Context.h"
 #include "nxt_jni_URLClassLoader.h"
 
@@ -123,7 +124,7 @@ nxt_java_Context_log(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
     const char      *msg_str;
     nxt_unit_ctx_t  *ctx;
 
-    ctx = (nxt_unit_ctx_t *) ctx_ptr;
+    ctx = nxt_jlong2ptr(ctx_ptr);
 
     msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
     if (msg_str == NULL) {

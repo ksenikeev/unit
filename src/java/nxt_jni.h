@@ -38,4 +38,17 @@ typedef struct {
 
 } nxt_java_request_data_t;
 
+
+static inline jlong
+nxt_ptr2jlong(void *ptr)
+{
+    return (jlong) (intptr_t) ptr;
+}
+
+static inline void *
+nxt_jlong2ptr(jlong l)
+{
+    return (void *) (intptr_t) l;
+}
+
 #endif  /* _NXT_JAVA_JNI_H_INCLUDED_ */

@@ -79,7 +79,7 @@ nxt_java_newHeaderNamesEnumeration(JNIEnv *env, nxt_unit_field_t *f,
 {
     return (*env)->NewObject(env,
         nxt_java_HeaderNamesEnumeration_class,
-        nxt_java_HeaderNamesEnumeration_ctor, (jlong) f,
+        nxt_java_HeaderNamesEnumeration_ctor, nxt_ptr2jlong(f),
         (jlong) fields_count);
 }
 
@@ -90,7 +90,7 @@ nxt_java_HeaderNamesEnumeration_nextElementPos(JNIEnv *env, jclass cls,
 {
     nxt_unit_field_t  *f;
 
-    f = (nxt_unit_field_t *) headers_ptr;
+    f = nxt_jlong2ptr(headers_ptr);
 
     if (pos >= size) {
         return size;
@@ -117,7 +117,7 @@ nxt_java_HeaderNamesEnumeration_nextElement(JNIEnv *env, jclass cls,
     jstring           res;
     nxt_unit_field_t  *f;
 
-    f = (nxt_unit_field_t *) headers_ptr;
+    f = nxt_jlong2ptr(headers_ptr);
 
     if (pos > 0) {
         while (pos < size

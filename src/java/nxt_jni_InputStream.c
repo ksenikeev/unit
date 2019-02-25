@@ -9,6 +9,7 @@
 #include <nxt_unit.h>
 #include <string.h>
 
+#include "nxt_jni.h"
 #include "nxt_jni_InputStream.h"
 #include "nxt_jni_URLClassLoader.h"
 
@@ -100,7 +101,7 @@ nxt_java_InputStream_readLine(JNIEnv *env, jclass cls,
     nxt_unit_buf_t           *b;
     nxt_unit_request_info_t  *req;
 
-    req = (nxt_unit_request_info_t *) req_info_ptr;
+    req = nxt_jlong2ptr(req_info_ptr);
 
     size = 0;
 
@@ -140,7 +141,7 @@ nxt_java_InputStream_isFinished(JNIEnv *env, jclass cls, jlong req_info_ptr)
 {
     nxt_unit_request_info_t  *req;
 
-    req = (nxt_unit_request_info_t *) req_info_ptr;
+    req = nxt_jlong2ptr(req_info_ptr);
 
     return req->content_length == 0;
 }
@@ -153,7 +154,7 @@ nxt_java_InputStream_readByte(JNIEnv *env, jclass cls, jlong req_info_ptr)
     ssize_t                  size;
     nxt_unit_request_info_t  *req;
 
-    req = (nxt_unit_request_info_t *) req_info_ptr;
+    req = nxt_jlong2ptr(req_info_ptr);
 
     size = nxt_unit_request_read(req, &b, 1);
 
@@ -169,7 +170,7 @@ nxt_java_InputStream_read(JNIEnv *env, jclass cls, jlong req_info_ptr,
     ssize_t                  res;
     nxt_unit_request_info_t  *req;
 
-    req = (nxt_unit_request_info_t *) req_info_ptr;
+    req = nxt_jlong2ptr(req_info_ptr);
 
     data = (*env)->GetPrimitiveArrayCritical(env, b, NULL);
 
@@ -190,7 +191,7 @@ nxt_java_InputStream_skip(JNIEnv *env, jclass cls, jlong req_info_ptr, jlong n)
     nxt_unit_buf_t           *buf;
     nxt_unit_request_info_t  *req;
 
-    req = (nxt_unit_request_info_t *) req_info_ptr;
+    req = nxt_jlong2ptr(req_info_ptr);
 
     rest = n;
 
@@ -227,7 +228,7 @@ nxt_java_InputStream_available(JNIEnv *env, jclass cls, jlong req_info_ptr)
 {
     nxt_unit_request_info_t  *req;
 
-    req = (nxt_unit_request_info_t *) req_info_ptr;
+    req = nxt_jlong2ptr(req_info_ptr);
 
     return req->content_length;
 }

@@ -88,7 +88,7 @@ nxt_java_OutputStream_writeByte(JNIEnv *env, jclass cls, jlong req_info_ptr,
     nxt_unit_request_info_t  *req;
     nxt_java_request_data_t  *data;
 
-    req = (nxt_unit_request_info_t *) req_info_ptr;
+    req = nxt_jlong2ptr(req_info_ptr);
     data = req->data;
 
     buf = nxt_java_OutputStream_req_buf(env, req);
@@ -98,7 +98,7 @@ nxt_java_OutputStream_writeByte(JNIEnv *env, jclass cls, jlong req_info_ptr,
 
     *buf->free++ = b;
 
-    if (buf->free - buf->start >= data->buf_size) {
+    if ((uint32_t) (buf->free - buf->start) >= data->buf_size) {
         nxt_java_OutputStream_flush_buf(env, req);
     }
 }
@@ -185,7 +185,7 @@ nxt_java_OutputStream_write(JNIEnv *env, jclass cls, jlong req_info_ptr,
     nxt_unit_request_info_t  *req;
     nxt_java_request_data_t  *data;
 
-    req = (nxt_unit_request_info_t *) req_info_ptr;
+    req = nxt_jlong2ptr(req_info_ptr);
     data = req->data;
 
     ptr = (*env)->GetPrimitiveArrayCritical(env, b, NULL);
@@ -205,7 +205,7 @@ nxt_java_OutputStream_write(JNIEnv *env, jclass cls, jlong req_info_ptr,
         len -= copy;
         off += copy;
 
-        if (buf->free - buf->start >= data->buf_size) {
+        if ((uint32_t) (buf->free - buf->start) >= data->buf_size) {
             rc = nxt_java_OutputStream_flush_buf(env, req);
             if (rc != NXT_UNIT_OK) {
                 break;
@@ -223,7 +223,7 @@ nxt_java_OutputStream_flush(JNIEnv *env, jclass cls, jlong req_info_ptr)
     nxt_unit_request_info_t  *req;
     nxt_java_request_data_t  *data;
 
-    req = (nxt_unit_request_info_t *) req_info_ptr;
+    req = nxt_jlong2ptr(req_info_ptr);
     data = req->data;
 
     if (data->buf != NULL && data->buf->free > data->buf->start) {
@@ -235,5 +235,5 @@ nxt_java_OutputStream_flush(JNIEnv *env, jclass cls, jlong req_info_ptr)
 static void JNICALL
 nxt_java_OutputStream_close(JNIEnv *env, jclass cls, jlong req_info_ptr)
 {
-    nxt_java_OutputStream_flush_buf(env, (nxt_unit_request_info_t *) req_info_ptr);
+    nxt_java_OutputStream_flush_buf(env, nxt_jlong2ptr(req_info_ptr));
 }
