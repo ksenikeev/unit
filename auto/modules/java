@@ -208,7 +208,7 @@ if grep ^$NXT_JAVA_MODULE: $NXT_MAKEFILE 2>&1 > /dev/null; then
     exit 1;
 fi
 
-. version
+. ./version
 
 NXT_UNIT_JAR=nginx-unit-jsc-${NXT_JAVA_MODULE}-$NXT_VERSION.jar
 
