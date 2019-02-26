@@ -144,7 +144,7 @@ nxt_java_Context_trace(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
     const char      *msg_str;
     nxt_unit_ctx_t  *ctx;
 
-    ctx = (nxt_unit_ctx_t *) ctx_ptr;
+    ctx = nxt_jlong2ptr(ctx_ptr);
 
     msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
     if (msg_str == NULL) {
