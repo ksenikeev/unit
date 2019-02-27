@@ -74,7 +74,6 @@ NXT_EXPORT nxt_conf_value_t *nxt_conf_get_object_member(nxt_conf_value_t *value,
     nxt_str_t *name, uint32_t *index);
 NXT_EXPORT nxt_conf_value_t *nxt_conf_next_object_member(
     nxt_conf_value_t *value, nxt_str_t *name, uint32_t *next);
-NXT_EXPORT nxt_uint_t nxt_conf_array_count(nxt_conf_value_t *value);
 NXT_EXPORT nxt_conf_value_t *nxt_conf_get_array_element(nxt_conf_value_t *value,
     uint32_t index);
 

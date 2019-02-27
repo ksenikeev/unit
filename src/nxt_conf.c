@@ -701,13 +701,6 @@ nxt_conf_next_object_member(nxt_conf_value_t *value, nxt_str_t *name,
 }
 
 
-nxt_uint_t
-nxt_conf_array_count(nxt_conf_value_t *value)
-{
-    return value->u.array->count;
-}
-
-
 nxt_conf_value_t *
 nxt_conf_get_array_element(nxt_conf_value_t *value, uint32_t index)
 {
