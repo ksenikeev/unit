@@ -567,9 +567,9 @@ nxt_java_Request_getServerName(JNIEnv *env, jclass cls, jlong req_ptr)
 
     r = nxt_jlong2ptr(req_ptr);
 
-    if (r->host_field != NXT_UNIT_NONE_FIELD) {
-        f = r->fields + r->host_field;
-
+    f = nxt_java_findHeader(r->fields, r->fields + r->fields_count,
+                            "Host", 4);
+    if (f != NULL) {
         host = nxt_unit_sptr_get(&f->value);
 
         colon = memchr(host, ':', f->value_length);
@@ -594,9 +594,9 @@ nxt_java_Request_getServerPort(JNIEnv *env, jclass cls, jlong req_ptr)
 
     r = nxt_jlong2ptr(req_ptr);
 
-    if (r->host_field != NXT_UNIT_NONE_FIELD) {
-        f = r->fields + r->host_field;
-
+    f = nxt_java_findHeader(r->fields, r->fields + r->fields_count,
+                            "Host", 4);
+    if (f != NULL) {
         host = nxt_unit_sptr_get(&f->value);
 
         colon = memchr(host, ':', f->value_length);
