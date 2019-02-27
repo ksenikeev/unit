@@ -8,6 +8,7 @@
 
 #include "nxt_jni_URLClassLoader.h"
 
+
 static jclass     nxt_java_URLClassLoader_class;
 static jmethodID  nxt_java_URLClassLoader_ctor;
 static jmethodID  nxt_java_URLClassLoader_parent_ctor;
@@ -16,6 +17,7 @@ static jmethodID  nxt_java_URLClassLoader_addURL;
 
 static jclass     nxt_java_URL_class;
 static jmethodID  nxt_java_URL_ctor;
+
 
 int
 nxt_java_initURLClassLoader(JNIEnv *env)
@@ -85,6 +87,7 @@ failed:
     return NXT_UNIT_ERROR;
 }
 
+
 jobject
 nxt_java_newURLClassLoader(JNIEnv *env, int url_count, char **urls)
 {
@@ -98,6 +101,7 @@ nxt_java_newURLClassLoader(JNIEnv *env, int url_count, char **urls)
     return (*env)->NewObject(env, nxt_java_URLClassLoader_class,
                              nxt_java_URLClassLoader_ctor, jurls);
 }
+
 
 jobject
 nxt_java_newURLClassLoader_parent(JNIEnv *env, int url_count, char **urls,
@@ -114,6 +118,7 @@ nxt_java_newURLClassLoader_parent(JNIEnv *env, int url_count, char **urls,
                              nxt_java_URLClassLoader_parent_ctor, jurls,
                              parent);
 }
+
 
 jobjectArray
 nxt_java_newURLs(JNIEnv *env, int url_count, char **urls)
@@ -146,6 +151,7 @@ nxt_java_newURLs(JNIEnv *env, int url_count, char **urls)
     return jurls;
 }
 
+
 jclass
 nxt_java_loadClass(JNIEnv *env, jobject cl, const char *name)
 {
@@ -159,6 +165,7 @@ nxt_java_loadClass(JNIEnv *env, jobject cl, const char *name)
     return (*env)->CallObjectMethod(env, cl, nxt_java_URLClassLoader_loadClass,
                                     jname);
 }
+
 
 void
 nxt_java_addURL(JNIEnv *env, jobject cl, const char *url)

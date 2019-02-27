@@ -24,69 +24,49 @@ static jmethodID  nxt_java_Request_ctor;
 
 static jstring JNICALL nxt_java_Request_getHeader(JNIEnv *env, jclass cls,
     jlong req_ptr, jstring name, jint name_len);
-
 static jobject JNICALL nxt_java_Request_getHeaderNames(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jobject JNICALL nxt_java_Request_getHeaders(JNIEnv *env, jclass cls,
     jlong req_ptr, jstring name, jint name_len);
-
 static jint JNICALL nxt_java_Request_getIntHeader(JNIEnv *env, jclass cls,
     jlong req_ptr, jstring name, jint name_len);
-
 static jstring JNICALL nxt_java_Request_getMethod(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getQueryString(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getRequestURI(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jlong JNICALL nxt_java_Request_getContentLength(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getContentType(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getLocalAddr(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getLocalName(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jint JNICALL nxt_java_Request_getLocalPort(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getProtocol(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getRemoteAddr(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getRemoteHost(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jint JNICALL nxt_java_Request_getRemotePort(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getScheme(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jstring JNICALL nxt_java_Request_getServerName(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static jint JNICALL nxt_java_Request_getServerPort(JNIEnv *env, jclass cls,
     jlong req_ptr);
-
 static void JNICALL nxt_java_Request_log(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jstring msg, jint msg_len);
-
 static void JNICALL nxt_java_Request_trace(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jstring msg, jint msg_len);
-
 static jobject JNICALL nxt_java_Request_getResponse(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
+
 
 int
 nxt_java_initRequest(JNIEnv *env, jobject cl)
@@ -552,11 +532,13 @@ nxt_java_Request_getRemotePort(JNIEnv *env, jclass cls, jlong req_ptr)
     return res;
 }
 
+
 static jstring JNICALL
 nxt_java_Request_getScheme(JNIEnv *env, jclass cls, jlong req_ptr)
 {
     return (*env)->NewStringUTF(env, "http");
 }
+
 
 static jstring JNICALL
 nxt_java_Request_getServerName(JNIEnv *env, jclass cls, jlong req_ptr)
@@ -583,6 +565,7 @@ nxt_java_Request_getServerName(JNIEnv *env, jclass cls, jlong req_ptr)
 
     return nxt_java_Request_getLocalName(env, cls, req_ptr);
 }
+
 
 static jint JNICALL
 nxt_java_Request_getServerPort(JNIEnv *env, jclass cls, jlong req_ptr)
@@ -619,6 +602,7 @@ nxt_java_Request_getServerPort(JNIEnv *env, jclass cls, jlong req_ptr)
     return nxt_java_Request_getLocalPort(env, cls, req_ptr);
 }
 
+
 static void JNICALL
 nxt_java_Request_log(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
     jint msg_len)
@@ -637,6 +621,7 @@ nxt_java_Request_log(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
 
     (*env)->ReleaseStringUTFChars(env, msg, msg_str);
 }
+
 
 static void JNICALL
 nxt_java_Request_trace(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
@@ -658,6 +643,7 @@ nxt_java_Request_trace(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
     (*env)->ReleaseStringUTFChars(env, msg, msg_str);
 #endif
 }
+
 
 static jobject JNICALL
 nxt_java_Request_getResponse(JNIEnv *env, jclass cls, jlong req_info_ptr)
