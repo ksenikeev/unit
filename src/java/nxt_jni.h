@@ -26,6 +26,7 @@ int nxt_java_strcaseeq(const char *str1, const char *str2, int len);
 
 jstring nxt_java_newString(JNIEnv *env, char *str, uint32_t len);
 
+
 typedef struct {
     uint32_t          header_size;
     uint32_t          buf_size;

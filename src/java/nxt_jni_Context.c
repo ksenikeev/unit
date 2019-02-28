@@ -20,7 +20,6 @@ static jmethodID  nxt_java_Context_stop;
 
 static void JNICALL nxt_java_Context_log(JNIEnv *env, jclass cls,
     jlong ctx_ptr, jstring msg, jint msg_len);
-
 static void JNICALL nxt_java_Context_trace(JNIEnv *env, jclass cls,
     jlong ctx_ptr, jstring msg, jint msg_len);
 

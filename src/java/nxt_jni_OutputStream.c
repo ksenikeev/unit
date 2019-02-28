@@ -13,22 +13,19 @@
 #include "nxt_jni_URLClassLoader.h"
 
 
-static jclass nxt_java_OutputStream_class;
-
 static void JNICALL nxt_java_OutputStream_writeByte(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jint b);
-
 static nxt_unit_buf_t *nxt_java_OutputStream_req_buf(JNIEnv *env,
     nxt_unit_request_info_t *req);
-
 static void JNICALL nxt_java_OutputStream_write(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jarray b, jint off, jint len);
-
 static void JNICALL nxt_java_OutputStream_flush(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
-
 static void JNICALL nxt_java_OutputStream_close(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
+
+
+static jclass  nxt_java_OutputStream_class;
 
 
 int

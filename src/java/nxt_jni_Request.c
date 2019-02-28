@@ -18,10 +18,6 @@
 #include "nxt_jni_HeaderNamesEnumeration.h"
 
 
-static jclass     nxt_java_Request_class;
-static jmethodID  nxt_java_Request_ctor;
-
-
 static jstring JNICALL nxt_java_Request_getHeader(JNIEnv *env, jclass cls,
     jlong req_ptr, jstring name, jint name_len);
 static jobject JNICALL nxt_java_Request_getHeaderNames(JNIEnv *env, jclass cls,
@@ -66,6 +62,10 @@ static void JNICALL nxt_java_Request_trace(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jstring msg, jint msg_len);
 static jobject JNICALL nxt_java_Request_getResponse(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
+
+
+static jclass     nxt_java_Request_class;
+static jmethodID  nxt_java_Request_ctor;
 
 
 int

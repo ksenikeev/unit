@@ -15,14 +15,14 @@
 #include "nxt_jni_HeaderNamesEnumeration.h"
 
 
-static jclass     nxt_java_HeaderNamesEnumeration_class;
-static jmethodID  nxt_java_HeaderNamesEnumeration_ctor;
-
 static jlong JNICALL nxt_java_HeaderNamesEnumeration_nextElementPos(JNIEnv *env,
     jclass cls, jlong headers_ptr, jlong size, jlong pos);
-
 static jstring JNICALL nxt_java_HeaderNamesEnumeration_nextElement(JNIEnv *env,
     jclass cls, jlong headers_ptr, jlong size, jlong pos);
+
+
+static jclass     nxt_java_HeaderNamesEnumeration_class;
+static jmethodID  nxt_java_HeaderNamesEnumeration_ctor;
 
 
 int

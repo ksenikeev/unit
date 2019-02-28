@@ -9,7 +9,6 @@
 #include <nxt_unit.h>
 #include <nxt_unit_field.h>
 
-
 #include "nxt_jni.h"
 
 

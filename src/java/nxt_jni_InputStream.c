@@ -14,25 +14,21 @@
 #include "nxt_jni_URLClassLoader.h"
 
 
-static jclass nxt_java_InputStream_class;
-
 static jint JNICALL nxt_java_InputStream_readLine(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jarray b, jint off, jint len);
-
 static jboolean JNICALL nxt_java_InputStream_isFinished(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
-
 static jint JNICALL nxt_java_InputStream_readByte(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
-
 static jint JNICALL nxt_java_InputStream_read(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jarray b, jint off, jint len);
-
 static jlong JNICALL nxt_java_InputStream_skip(JNIEnv *env, jclass cls,
     jlong req_info_ptr, jlong n);
-
 static jint JNICALL nxt_java_InputStream_available(JNIEnv *env, jclass cls,
     jlong req_info_ptr);
+
+
+static jclass  nxt_java_InputStream_class;
 
 
 int
