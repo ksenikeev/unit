@@ -736,8 +736,9 @@ nxt_java_Response_setHeader(JNIEnv *env, jclass cls,
 
     value_str = (*env)->GetPrimitiveArrayCritical(env, value, NULL);
     if (value_str == NULL) {
-        req = nxt_jlong2ptr(req_info_ptr);
         (*env)->ReleasePrimitiveArrayCritical(env, name, name_str, 0);
+
+        req = nxt_jlong2ptr(req_info_ptr);
         nxt_unit_req_warn(req, "setHeader: failed to get value content");
 
         return;
