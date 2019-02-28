@@ -648,8 +648,11 @@ nxt_java_Request_trace(JNIEnv *env, jclass cls, jlong req_info_ptr, jstring msg,
 static jobject JNICALL
 nxt_java_Request_getResponse(JNIEnv *env, jclass cls, jlong req_info_ptr)
 {
-    nxt_unit_request_info_t  *req = nxt_jlong2ptr(req_info_ptr);
-    nxt_java_request_data_t  *data = req->data;
+    nxt_unit_request_info_t  *req;
+    nxt_java_request_data_t  *data;
+
+    req = nxt_jlong2ptr(req_info_ptr);
+    data = req->data;
 
     return data->jresp;
 }
