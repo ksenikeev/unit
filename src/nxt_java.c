@@ -38,14 +38,14 @@ static uint32_t  compat[] = {
 char  *nxt_java_modules;
 
 
-#define STR1(x)  #x
-#define STR(x) STR1(x)
+#define NXT_STRING(x)   _NXT_STRING(x)
+#define _NXT_STRING(x)  #x
 
 NXT_EXPORT nxt_app_module_t  nxt_app_module = {
     sizeof(compat),
     compat,
     nxt_string("java"),
-    STR(NXT_JAVA_VERSION),
+    NXT_STRING(NXT_JAVA_VERSION),
     nxt_java_pre_init,
     nxt_java_init,
 };
