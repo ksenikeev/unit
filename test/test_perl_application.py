@@ -45,7 +45,7 @@ class TestUnitPerlApplication(unit.TestUnitApplicationPerl):
             'Psgi-Multiprocess': '1',
             'Psgi-Run-Once': '',
             'Psgi-Nonblocking': '',
-            'Psgi-Streaming': ''
+            'Psgi-Streaming': '1'
         }, 'headers')
         self.assertEqual(resp['body'], body, 'body')
 
@@ -199,6 +199,22 @@ class TestUnitPerlApplication(unit.TestUnitApplicationPerl):
         self.assertIsNotNone(
             self.search_in_log(r'\[error\].+IOFake close\(\) called'),
             'body io fake close')
+
+    def test_perl_delayed_response(self):
+        self.load('delayed_response')
+
+        resp = self.get()
+
+        self.assertEqual(resp['status'], 200, 'status')
+        self.assertEqual(resp['body'], 'Hello World!', 'body')
+
+    def test_perl_streaming_body(self):
+        self.load('streaming_body')
+
+        resp = self.get()
+
+        self.assertEqual(resp['status'], 200, 'status')
+        self.assertEqual(resp['body'], 'Hello World!', 'body')
 
 if __name__ == '__main__':
     TestUnitPerlApplication.main()

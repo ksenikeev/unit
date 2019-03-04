@@ -65,7 +65,6 @@ class TestUnitPythonApplication(unit.TestUnitApplicationPython):
         self.assertEqual(resp['headers']['Query-String'], '',
             'query string empty')
 
-    @unittest.expectedFailure
     def test_python_application_query_string_absent(self):
         self.load('query_string')
 
@@ -132,6 +131,11 @@ class TestUnitPythonApplication(unit.TestUnitApplicationPython):
         self.assertEqual(resp['body'], '0123456789', 'keep-alive 2')
 
     def test_python_keepalive_reconfigure(self):
+        self.skip_alerts.extend([
+            r'pthread_mutex.+failed',
+            r'failed to apply',
+            r'process \d+ exited on signal'
+        ])
         self.load('mirror')
 
         body = '0123456789'
