@@ -26,6 +26,7 @@ int nxt_java_strcaseeq(const char *str1, const char *str2, int len);
 
 jstring nxt_java_newString(JNIEnv *env, char *str, uint32_t len);
 
+
 typedef struct {
     uint32_t          header_size;
     uint32_t          buf_size;
@@ -37,5 +38,18 @@ typedef struct {
     nxt_unit_buf_t    *buf;
 
 } nxt_java_request_data_t;
+
+
+static inline jlong
+nxt_ptr2jlong(void *ptr)
+{
+    return (jlong) (intptr_t) ptr;
+}
+
+static inline void *
+nxt_jlong2ptr(jlong l)
+{
+    return (void *) (intptr_t) l;
+}
 
 #endif  /* _NXT_JAVA_JNI_H_INCLUDED_ */

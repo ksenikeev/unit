@@ -79,7 +79,7 @@ nxt_java_newHeadersEnumeration(JNIEnv *env, nxt_unit_field_t *f,
 {
     return (*env)->NewObject(env,
         nxt_java_HeadersEnumeration_class,
-        nxt_java_HeadersEnumeration_ctor, (jlong) f,
+        nxt_java_HeadersEnumeration_ctor, nxt_ptr2jlong(f),
         (jlong) fields_count, (jlong) pos);
 }
 
@@ -90,7 +90,7 @@ nxt_java_HeadersEnumeration_nextElementPos(JNIEnv *env, jclass cls,
 {
     nxt_unit_field_t  *f, *init_field;
 
-    f = (nxt_unit_field_t *) headers_ptr;
+    f = nxt_jlong2ptr(headers_ptr);
 
     init_field = f + ipos;
 
@@ -123,7 +123,7 @@ nxt_java_HeadersEnumeration_nextElement(JNIEnv *env, jclass cls,
 {
     nxt_unit_field_t  *f, *init_field;
 
-    f = (nxt_unit_field_t *) headers_ptr;
+    f = nxt_jlong2ptr(headers_ptr);
 
     init_field = f + ipos;
 

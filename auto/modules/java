@@ -4,19 +4,9 @@
 
 shift
 
-if [ ! -f $NXT_AUTOCONF_DATA ]; then
-   echo
-   echo Please run common $0 before configuring module \"$nxt_module\".
-   echo
-   exit 1
-fi
-
-. $NXT_AUTOCONF_DATA
-
 NXT_JAVA_HOME=${JAVA_HOME-}
 NXT_JAR_REPO=http://central.maven.org/maven2/
 NXT_JAR_LOCAL_REPO=$HOME/.m2/repository/
-NXT_JARS=$NXT_MODULES
 
 for nxt_option; do
 
@@ -40,9 +30,11 @@ for nxt_option; do
     --module=NAME         set unit Java module name
     --home=DIR            set Java home directory
     --lib-path=DIRECTORY  set directory path to libjvm.so library
-    --repo=URL            set Maven remote repository URL ($NXT_JAR_REPO)
-    --local-repo=DIR      set local repository directory ($NXT_JAR_LOCAL_REPO)
-    --jars=DIR            set jars install/search directory ($NXT_JARS)
+    --repo=URL            set Maven remote repository URL
+                          default: "$NXT_JAR_REPO"
+    --local-repo=DIR      set local repository directory
+                          default: "$NXT_JAR_LOCAL_REPO"
+    --jars=DIR            set jars install/search directory
 
 END
             exit 0
@@ -59,6 +51,17 @@ END
 done
 
 
+if [ ! -f $NXT_AUTOCONF_DATA ]; then
+   echo
+   echo Please run common $0 before configuring module \"$nxt_module\".
+   echo
+   exit 1
+fi
+
+. $NXT_AUTOCONF_DATA
+
+
+NXT_JARS=${NXT_JARS=$NXT_MODULES}
 NXT_JAVA_MODULE=${NXT_JAVA_MODULE=java}
 NXT_JAVA_LIB_PATH=${NXT_JAVA_LIB_PATH=}
 
@@ -79,10 +82,10 @@ if [ -n "${NXT_JAVA_HOME}" ]; then
     NXT_JAVA="${NXT_JAVA_HOME}/bin/java"
 
 else
-    $echo -n "looking for java executable"
-    $echo "looking for java executable ..." >> $NXT_AUTOCONF_ERR
+    $echo -n "checking for java executable"
+    $echo "checking for java executable ..." >> $NXT_AUTOCONF_ERR
 
-    NXT_JAVA=`which java`
+    NXT_JAVA=`which java || :`
     if [ -z "$NXT_JAVA" -o ! -x "$NXT_JAVA" ]; then
         $echo
         $echo $0: error: java executable not found.
@@ -95,8 +98,8 @@ else
 
     "$NXT_JAVA" -version
 
-    $echo -n "query java.home"
-    $echo "query java.home ..." >> $NXT_AUTOCONF_ERR
+    $echo -n "checking java.home"
+    $echo "checking java.home ..." >> $NXT_AUTOCONF_ERR
 
     NXT_JAVA_HOME=`$NXT_JAVA -XshowSettings 2>&1 | grep -F -e java.home | sed -e 's/^.*= //'`
     if [ -z "$NXT_JAVA_HOME" ]; then
@@ -144,8 +147,8 @@ case "$NXT_SYSTEM" in
 esac
 
 if [ -z "$NXT_JAVA_LIB_PATH" ]; then
-    $echo -n "query library path"
-    $echo "query library path ..." >> $NXT_AUTOCONF_ERR
+    $echo -n "checking library path"
+    $echo "checking library path ..." >> $NXT_AUTOCONF_ERR
 
     if [ ! -x "$NXT_JAVA" ]; then
         $echo
@@ -208,8 +211,9 @@ if grep ^$NXT_JAVA_MODULE: $NXT_MAKEFILE 2>&1 > /dev/null; then
     exit 1;
 fi
 
-NXT_UNIT_JAR_VERSION=`grep 'define NXT_VERSION' src/nxt_main.h | sed -e 's/^.*"\(.*\)".*/\1/'`
-NXT_UNIT_JAR=nginx-unit-jsc-${NXT_JAVA_MODULE}-$NXT_UNIT_JAR_VERSION.jar
+. ./version
+
+NXT_UNIT_JAR=nginx-unit-jsc-${NXT_JAVA_MODULE}-$NXT_VERSION.jar
 
 NXT_JAVA_BUILD_CP=$NXT_BUILD_DIR/$NXT_JAVA_MODULE
 NXT_JAVA_INSTALL_JARS=
@@ -415,8 +419,20 @@ $NXT_BUILD_DIR/$NXT_JAVA_MODULE/.classes: \$(NXT_JAVA_SRCS)
 	$NXT_JAVAC -d $NXT_BUILD_DIR/$NXT_JAVA_MODULE -cp $NXT_JAVA_BUILD_CP \\
 		\$(NXT_JAVA_SRCS)
 
-$NXT_BUILD_DIR/$NXT_UNIT_JAR: $NXT_BUILD_DIR/$NXT_JAVA_MODULE/.classes
-	$NXT_JAVA_HOME/bin/jar c -C $NXT_BUILD_DIR/$NXT_JAVA_MODULE nginx/unit > \$@
+$NXT_BUILD_DIR/$NXT_JAVA_MODULE/META-INF/LICENSE: LICENSE
+	mkdir -p $NXT_BUILD_DIR/$NXT_JAVA_MODULE/META-INF
+	cp -p LICENSE \$@
+
+$NXT_BUILD_DIR/$NXT_JAVA_MODULE/META-INF/NOTICE: NOTICE
+	mkdir -p $NXT_BUILD_DIR/$NXT_JAVA_MODULE/META-INF
+	cp -p NOTICE \$@
+
+
+$NXT_BUILD_DIR/$NXT_UNIT_JAR: $NXT_BUILD_DIR/$NXT_JAVA_MODULE/.classes \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/META-INF/LICENSE \\
+    $NXT_BUILD_DIR/$NXT_JAVA_MODULE/META-INF/NOTICE
+	$NXT_JAVA_HOME/bin/jar c -C $NXT_BUILD_DIR/$NXT_JAVA_MODULE META-INF \\
+		-C $NXT_BUILD_DIR/$NXT_JAVA_MODULE nginx/unit > \$@
 
 END
 

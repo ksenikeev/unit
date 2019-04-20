@@ -21,6 +21,7 @@ typedef enum {
     NXT_HTTP_NOT_MODIFIED = 304,
 
     NXT_HTTP_BAD_REQUEST = 400,
+    NXT_HTTP_NOT_FOUND = 404,
     NXT_HTTP_REQUEST_TIMEOUT = 408,
     NXT_HTTP_LENGTH_REQUIRED = 411,
     NXT_HTTP_PAYLOAD_TOO_LARGE = 413,
@@ -112,6 +113,8 @@ struct nxt_http_request_s {
     nxt_buf_t                       *out;
     const nxt_http_request_state_t  *state;
 
+    nxt_str_t                       host;
+    nxt_str_t                       server_name;
     nxt_str_t                       target;
     nxt_str_t                       version;
     nxt_str_t                       *method;
@@ -124,11 +127,14 @@ struct nxt_http_request_s {
     nxt_http_field_t                *cookie;
     nxt_http_field_t                *referer;
     nxt_http_field_t                *user_agent;
-    nxt_str_t                       host;
     nxt_off_t                       content_length_n;
 
     nxt_sockaddr_t                  *remote;
     nxt_sockaddr_t                  *local;
+    void                            *tls;
+
+    nxt_timer_t                     timer;
+    void                            *timer_data;
 
     nxt_buf_t                       *last;
 
@@ -136,6 +142,7 @@ struct nxt_http_request_s {
 
     nxt_http_status_t               status:16;
 
+    uint8_t                         pass_count;   /* 8 bits */
     uint8_t                         protocol;     /* 2 bits */
     uint8_t                         logged;       /* 1 bit  */
     uint8_t                         header_sent;  /* 1 bit  */
@@ -143,10 +150,27 @@ struct nxt_http_request_s {
 };
 
 
+typedef struct nxt_http_route_s     nxt_http_route_t;
+
+
+struct nxt_http_pass_s {
+    nxt_http_pass_t                 *(*handler)(nxt_task_t *task,
+                                        nxt_http_request_t *r,
+                                        nxt_http_pass_t *pass);
+    union {
+        nxt_http_route_t            *route;
+        nxt_app_t                   *application;
+    } u;
+
+    nxt_str_t                       name;
+};
+
+
 typedef void (*nxt_http_proto_body_read_t)(nxt_task_t *task,
     nxt_http_request_t *r);
 typedef void (*nxt_http_proto_local_addr_t)(nxt_task_t *task,
     nxt_http_request_t *r);
+typedef void (*nxt_http_proto_tls_t)(nxt_task_t *task, nxt_http_request_t *r);
 typedef void (*nxt_http_proto_header_send_t)(nxt_task_t *task,
     nxt_http_request_t *r);
 typedef void (*nxt_http_proto_send_t)(nxt_task_t *task, nxt_http_request_t *r,
@@ -168,7 +192,6 @@ nxt_http_request_t *nxt_http_request_create(nxt_task_t *task);
 void nxt_http_request_error(nxt_task_t *task, nxt_http_request_t *r,
     nxt_http_status_t status);
 void nxt_http_request_read_body(nxt_task_t *task, nxt_http_request_t *r);
-void nxt_http_request_local_addr(nxt_task_t *task, nxt_http_request_t *r);
 void nxt_http_request_header_send(nxt_task_t *task, nxt_http_request_t *r);
 void nxt_http_request_send(nxt_task_t *task, nxt_http_request_t *r,
     nxt_buf_t *out);
@@ -184,6 +207,18 @@ nxt_int_t nxt_http_request_field(void *ctx, nxt_http_field_t *field,
 nxt_int_t nxt_http_request_content_length(void *ctx, nxt_http_field_t *field,
     uintptr_t data);
 
+nxt_http_routes_t *nxt_http_routes_create(nxt_task_t *task,
+    nxt_router_temp_conf_t *tmcf, nxt_conf_value_t *routes_conf);
+nxt_http_pass_t *nxt_http_pass_create(nxt_task_t *task,
+    nxt_router_temp_conf_t *tmcf, nxt_str_t *name);
+void nxt_http_routes_resolve(nxt_task_t *task, nxt_router_temp_conf_t *tmcf);
+nxt_http_pass_t *nxt_http_pass_application(nxt_task_t *task,
+    nxt_router_temp_conf_t *tmcf, nxt_str_t *name);
+void nxt_http_routes_cleanup(nxt_task_t *task, nxt_http_routes_t *routes);
+void nxt_http_pass_cleanup(nxt_task_t *task, nxt_http_pass_t *pass);
+
+nxt_http_pass_t *nxt_http_request_application(nxt_task_t *task,
+    nxt_http_request_t *r, nxt_http_pass_t *pass);
 
 extern nxt_time_string_t  nxt_http_date_cache;
 
@@ -191,6 +226,7 @@ extern nxt_lvlhsh_t                        nxt_response_fields_hash;
 
 extern const nxt_http_proto_body_read_t        nxt_http_proto_body_read[];
 extern const nxt_http_proto_local_addr_t       nxt_http_proto_local_addr[];
+extern const nxt_http_proto_tls_t              nxt_http_proto_tls[];
 extern const nxt_http_proto_header_send_t      nxt_http_proto_header_send[];
 extern const nxt_http_proto_send_t             nxt_http_proto_send[];
 extern const nxt_http_proto_body_bytes_sent_t  nxt_http_proto_body_bytes_sent[];

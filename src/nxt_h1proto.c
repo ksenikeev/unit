@@ -35,6 +35,7 @@ static void nxt_h1p_request_body_read(nxt_task_t *task, nxt_http_request_t *r);
 static void nxt_h1p_conn_request_body_read(nxt_task_t *task, void *obj,
     void *data);
 static void nxt_h1p_request_local_addr(nxt_task_t *task, nxt_http_request_t *r);
+static void nxt_h1p_request_tls(nxt_task_t *task, nxt_http_request_t *r);
 static void nxt_h1p_request_header_send(nxt_task_t *task,
     nxt_http_request_t *r);
 static void nxt_h1p_request_send(nxt_task_t *task, nxt_http_request_t *r,
@@ -98,6 +99,13 @@ const nxt_http_proto_body_read_t  nxt_http_proto_body_read[3] = {
 
 const nxt_http_proto_local_addr_t  nxt_http_proto_local_addr[3] = {
     nxt_h1p_request_local_addr,
+    NULL,
+    NULL,
+};
+
+
+const nxt_http_proto_tls_t  nxt_http_proto_tls[3] = {
+    nxt_h1p_request_tls,
     NULL,
     NULL,
 };
@@ -563,6 +571,8 @@ nxt_h1p_conn_request_header_parse(nxt_task_t *task, void *obj, void *data)
 
 error:
 
+    h1p->keepalive = 0;
+
     nxt_http_request_error(task, r, status);
 }
 
@@ -808,6 +818,15 @@ static void
 nxt_h1p_request_local_addr(nxt_task_t *task, nxt_http_request_t *r)
 {
     r->local = nxt_conn_local_addr(task, r->proto.h1->conn);
+}
+
+
+static void
+nxt_h1p_request_tls(nxt_task_t *task, nxt_http_request_t *r)
+{
+#if (NXT_TLS)
+    r->tls = r->proto.h1->conn->u.tls;
+#endif
 }
 
 
@@ -1218,6 +1237,7 @@ nxt_h1p_conn_request_timeout(nxt_task_t *task, void *obj, void *data)
     nxt_debug(task, "h1p conn request timeout");
 
     c = nxt_read_timer_conn(timer);
+    c->block_read = 1;
     /*
      * Disable SO_LINGER off during socket closing
      * to send "408 Request Timeout" error response.
@@ -1248,6 +1268,7 @@ nxt_h1p_conn_request_send_timeout(nxt_task_t *task, void *obj, void *data)
     nxt_debug(task, "h1p conn request send timeout");
 
     c = nxt_write_timer_conn(timer);
+    c->block_write = 1;
     h1p = c->socket.data;
 
     nxt_h1p_request_error(task, h1p, h1p->request);
@@ -1462,6 +1483,7 @@ nxt_h1p_idle_timeout(nxt_task_t *task, void *obj, void *data)
     nxt_debug(task, "h1p idle timeout");
 
     c = nxt_read_timer_conn(timer);
+    c->block_read = 1;
 
     nxt_h1p_idle_response(task, c);
 }
@@ -1557,6 +1579,7 @@ nxt_h1p_idle_response_timeout(nxt_task_t *task, void *obj, void *data)
     nxt_debug(task, "h1p idle timeout response timeout");
 
     c = nxt_read_timer_conn(timer);
+    c->block_write = 1;
 
     nxt_h1p_shutdown(task, c);
 }

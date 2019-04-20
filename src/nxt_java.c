@@ -38,14 +38,14 @@ static uint32_t  compat[] = {
 char  *nxt_java_modules;
 
 
-#define STR1(x)  #x
-#define STR(x) STR1(x)
+#define NXT_STRING(x)   _NXT_STRING(x)
+#define _NXT_STRING(x)  #x
 
 NXT_EXPORT nxt_app_module_t  nxt_app_module = {
     sizeof(compat),
     compat,
     nxt_string("java"),
-    STR(NXT_JAVA_VERSION),
+    NXT_STRING(NXT_JAVA_VERSION),
     nxt_java_pre_init,
     nxt_java_init,
 };
@@ -140,7 +140,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     c = &conf->u.java;
 
     if (c->options != NULL) {
-        jvm_args.nOptions += nxt_conf_array_count(c->options);
+        jvm_args.nOptions += nxt_conf_array_elements_count(c->options);
     }
 
     jvm_opt = nxt_malloc(jvm_args.nOptions * sizeof(JavaVMOption));
@@ -193,7 +193,7 @@ nxt_java_init(nxt_task_t *task, nxt_common_app_conf_t *conf)
     }
 
     if (c->classpath != NULL) {
-        classpath_count = nxt_conf_array_count(c->classpath);
+        classpath_count = nxt_conf_array_elements_count(c->classpath);
         classpath_arr = nxt_malloc(classpath_count * sizeof(char *));
 
         for (i = 0; /* void */ ; i++) {

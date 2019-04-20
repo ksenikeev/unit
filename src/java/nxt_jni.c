@@ -9,7 +9,6 @@
 #include <nxt_unit.h>
 #include <nxt_unit_field.h>
 
-
 #include "nxt_jni.h"
 
 
@@ -110,7 +109,7 @@ nxt_java_findHeader(nxt_unit_field_t *f, nxt_unit_field_t *end,
 {
     const char  *field_name;
 
-    for (; f < end; f++) {
+    for (/* void */ ; f < end; f++) {
         if (f->skip != 0 || f->name_length != name_len) {
             continue;
         }

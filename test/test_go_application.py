@@ -1,21 +1,25 @@
 import unittest
-import unit
+from unit.applications.lang.go import TestApplicationGo
 
-class TestUnitGoApplication(unit.TestUnitApplicationGo):
 
+class TestGoApplication(TestApplicationGo):
     def setUpClass():
-        unit.TestUnit().check_modules('go')
+        TestApplicationGo().check_modules('go')
 
     def test_go_application_variables(self):
         self.load('variables')
 
         body = 'Test body string.'
 
-        resp = self.post(headers={
-            'Host': 'localhost',
-            'Content-Type': 'text/html',
-            'Custom-Header': 'blah'
-        }, body=body)
+        resp = self.post(
+            headers={
+                'Host': 'localhost',
+                'Content-Type': 'text/html',
+                'Custom-Header': 'blah',
+                'Connection': 'close',
+            },
+            body=body,
+        )
 
         self.assertEqual(resp['status'], 200, 'status')
         headers = resp['headers']
@@ -24,20 +28,28 @@ class TestUnitGoApplication(unit.TestUnitApplicationGo):
 
         date = headers.pop('Date')
         self.assertEqual(date[-4:], ' GMT', 'date header timezone')
-        self.assertLess(abs(self.date_to_sec_epoch(date) - self.sec_epoch()), 5,
-            'date header')
+        self.assertLess(
+            abs(self.date_to_sec_epoch(date) - self.sec_epoch()),
+            5,
+            'date header',
+        )
 
-        self.assertDictEqual(headers, {
-            'Content-Length': str(len(body)),
-            'Content-Type': 'text/html',
-            'Request-Method': 'POST',
-            'Request-Uri': '/',
-            'Http-Host': 'localhost',
-            'Server-Protocol': 'HTTP/1.1',
-            'Server-Protocol-Major': '1',
-            'Server-Protocol-Minor': '1',
-            'Custom-Header': 'blah'
-        }, 'headers')
+        self.assertDictEqual(
+            headers,
+            {
+                'Content-Length': str(len(body)),
+                'Content-Type': 'text/html',
+                'Request-Method': 'POST',
+                'Request-Uri': '/',
+                'Http-Host': 'localhost',
+                'Server-Protocol': 'HTTP/1.1',
+                'Server-Protocol-Major': '1',
+                'Server-Protocol-Minor': '1',
+                'Custom-Header': 'blah',
+                'Connection': 'close',
+            },
+            'headers',
+        )
         self.assertEqual(resp['body'], body, 'body')
 
     def test_go_application_get_variables(self):
@@ -51,11 +63,14 @@ class TestUnitGoApplication(unit.TestUnitApplicationGo):
     def test_go_application_post_variables(self):
         self.load('post_variables')
 
-        resp = self.post(headers={
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Host': 'localhost',
-            'Connection': 'close'
-        }, body='var1=val1&var2=&var3')
+        resp = self.post(
+            headers={
+                'Host': 'localhost',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Connection': 'close',
+            },
+            body='var1=val1&var2=&var3',
+        )
 
         self.assertEqual(resp['headers']['X-Var-1'], 'val1', 'POST variables')
         self.assertEqual(resp['headers']['X-Var-2'], '', 'POST variables 2')
@@ -67,36 +82,47 @@ class TestUnitGoApplication(unit.TestUnitApplicationGo):
         resp = self.get()
 
         self.assertEqual(resp['status'], 404, '404 status')
-        self.assertRegex(resp['body'], r'<title>404 Not Found</title>',
-            '404 body')
+        self.assertRegex(
+            resp['body'], r'<title>404 Not Found</title>', '404 body'
+        )
 
     def test_go_keepalive_body(self):
         self.load('mirror')
 
-        (resp, sock) = self.post(headers={
-            'Connection': 'keep-alive',
-            'Content-Type': 'text/html',
-            'Host': 'localhost'
-        }, start=True, body='0123456789' * 500)
+        (resp, sock) = self.post(
+            headers={
+                'Host': 'localhost',
+                'Connection': 'keep-alive',
+                'Content-Type': 'text/html',
+            },
+            start=True,
+            body='0123456789' * 500,
+        )
 
         self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')
 
-        resp = self.post(headers={
-            'Connection': 'close',
-            'Content-Type': 'text/html',
-            'Host': 'localhost'
-        }, sock=sock, body='0123456789')
+        resp = self.post(
+            headers={
+                'Host': 'localhost',
+                'Content-Type': 'text/html',
+                'Connection': 'close',
+            },
+            sock=sock,
+            body='0123456789',
+        )
 
         self.assertEqual(resp['body'], '0123456789', 'keep-alive 2')
 
     def test_go_application_cookies(self):
         self.load('cookies')
 
-        resp = self.get(headers={
-            'Cookie': 'var1=val1; var2=val2',
-            'Host': 'localhost',
-            'Connection': 'close'
-        })
+        resp = self.get(
+            headers={
+                'Host': 'localhost',
+                'Cookie': 'var1=val1; var2=val2',
+                'Connection': 'close',
+            }
+        )
 
         self.assertEqual(resp['headers']['X-Cookie-1'], 'val1', 'cookie 1')
         self.assertEqual(resp['headers']['X-Cookie-2'], 'val2', 'cookie 2')
@@ -104,15 +130,22 @@ class TestUnitGoApplication(unit.TestUnitApplicationGo):
     def test_go_application_command_line_arguments_type(self):
         self.load('command_line_arguments')
 
-        self.assertIn('error', self.conf(''"a b c",
-            'applications/command_line_arguments/arguments'), 'arguments type')
+        self.assertIn(
+            'error',
+            self.conf(
+                '' "a b c", 'applications/command_line_arguments/arguments'
+            ),
+            'arguments type',
+        )
 
     def test_go_application_command_line_arguments_0(self):
         self.load('command_line_arguments')
 
-        self.assertEqual(self.get()['headers']['X-Arg-0'],
+        self.assertEqual(
+            self.get()['headers']['X-Arg-0'],
             self.conf_get('applications/command_line_arguments/executable'),
-            'argument 0')
+            'argument 0',
+        )
 
     def test_go_application_command_line_arguments(self):
         self.load('command_line_arguments')
@@ -121,11 +154,14 @@ class TestUnitGoApplication(unit.TestUnitApplicationGo):
         arg2 = '--cc-opt=\'-O0 -DNXT_DEBUG_MEMORY=1 -fsanitize=address\''
         arg3 = '--debug'
 
-        self.conf('["' + arg1 + '", "' + arg2 + '", "' + arg3 + '"]',
-            'applications/command_line_arguments/arguments')
+        self.conf(
+            '["' + arg1 + '", "' + arg2 + '", "' + arg3 + '"]',
+            'applications/command_line_arguments/arguments',
+        )
 
-        self.assertEqual(self.get()['body'], arg1 + ',' + arg2 + ',' + arg3,
-            'arguments')
+        self.assertEqual(
+            self.get()['body'], arg1 + ',' + arg2 + ',' + arg3, 'arguments'
+        )
 
     def test_go_application_command_line_arguments_change(self):
         self.load('command_line_arguments')
@@ -142,8 +178,10 @@ class TestUnitGoApplication(unit.TestUnitApplicationGo):
 
         self.conf('[]', args_path)
 
-        self.assertEqual(self.get()['headers']['Content-Length'], '0',
-            'arguments empty')
+        self.assertEqual(
+            self.get()['headers']['Content-Length'], '0', 'arguments empty'
+        )
+
 
 if __name__ == '__main__':
-    TestUnitGoApplication.main()
+    TestGoApplication.main()

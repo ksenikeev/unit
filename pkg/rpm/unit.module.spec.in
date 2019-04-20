@@ -10,11 +10,7 @@
 %define unit_version %%UNIT_VERSION%%
 %define unit_release %%UNIT_RELEASE%%%{?dist}.ngx
 
-%if (0%{?rhel} == 6) && (%{_arch} == x86_64)
-%define CC_OPT %{optflags} -fno-strict-aliasing
-%else
 %define CC_OPT %{optflags}
-%endif
 
 %define CONFIGURE_ARGS $(echo "%%CONFIGURE_ARGS%%")
 
@@ -48,7 +44,7 @@ This package contains %%SUMMARY%%.
 %debug_package
 %endif
 
-%if 0%{?fedora}
+%if (0%{?fedora}) || (0%{?rhel} >= 8)
 %define _debugsource_template %{nil}
 %endif
 
@@ -76,14 +72,20 @@ make %%MODULE_MAKEARGS%%
 %install
 %{__rm} -rf %{buildroot}
 %{__mkdir} -p %{buildroot}%{_datadir}/doc/%%NAME%%
+if [ `basename %{SOURCE100}` == COPYRIGHT.%{name} ]; then
+%{__install} -m 644 -p %{SOURCE100} \
+    %{buildroot}%{_datadir}/doc/%%NAME%%/COPYRIGHT
+else
 %{__install} -m 644 -p NOTICE \
     %{buildroot}%{_datadir}/doc/%%NAME%%/COPYRIGHT
+fi
 %%MODULE_PREINSTALL%%
 %{__ln_s} build-debug build
 DESTDIR=%{buildroot} make %%MODULE_INSTARGS%%
 %{__rm} -f build
 %{__ln_s} build-nodebug build
 DESTDIR=%{buildroot} make %%MODULE_INSTARGS%%
+%%MODULE_POSTINSTALL%%
 
 %check
 %{__rm} -rf %{buildroot}/usr/src

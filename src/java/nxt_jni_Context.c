@@ -8,8 +8,10 @@
 #include <nxt_unit.h>
 #include <jni.h>
 
+#include "nxt_jni.h"
 #include "nxt_jni_Context.h"
 #include "nxt_jni_URLClassLoader.h"
+
 
 static jclass     nxt_java_Context_class;
 static jmethodID  nxt_java_Context_start;
@@ -18,9 +20,9 @@ static jmethodID  nxt_java_Context_stop;
 
 static void JNICALL nxt_java_Context_log(JNIEnv *env, jclass cls,
     jlong ctx_ptr, jstring msg, jint msg_len);
-
 static void JNICALL nxt_java_Context_trace(JNIEnv *env, jclass cls,
     jlong ctx_ptr, jstring msg, jint msg_len);
+
 
 int
 nxt_java_initContext(JNIEnv *env, jobject cl)
@@ -89,6 +91,7 @@ failed:
     return NXT_UNIT_ERROR;
 }
 
+
 jobject
 nxt_java_startContext(JNIEnv *env, const char *webapp, jobject classpaths)
 {
@@ -104,17 +107,20 @@ nxt_java_startContext(JNIEnv *env, const char *webapp, jobject classpaths)
                                           classpaths);
 }
 
+
 void
 nxt_java_service(JNIEnv *env, jobject ctx, jobject jreq, jobject jresp)
 {
     (*env)->CallVoidMethod(env, ctx, nxt_java_Context_service, jreq, jresp);
 }
 
+
 void
 nxt_java_stopContext(JNIEnv *env, jobject ctx)
 {
     (*env)->CallVoidMethod(env, ctx, nxt_java_Context_stop);
 }
+
 
 static void JNICALL
 nxt_java_Context_log(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
@@ -123,7 +129,7 @@ nxt_java_Context_log(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
     const char      *msg_str;
     nxt_unit_ctx_t  *ctx;
 
-    ctx = (nxt_unit_ctx_t *) ctx_ptr;
+    ctx = nxt_jlong2ptr(ctx_ptr);
 
     msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
     if (msg_str == NULL) {
@@ -135,6 +141,7 @@ nxt_java_Context_log(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
     (*env)->ReleaseStringUTFChars(env, msg, msg_str);
 }
 
+
 static void JNICALL
 nxt_java_Context_trace(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
     jint msg_len)
@@ -143,7 +150,7 @@ nxt_java_Context_trace(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
     const char      *msg_str;
     nxt_unit_ctx_t  *ctx;
 
-    ctx = (nxt_unit_ctx_t *) ctx_ptr;
+    ctx = nxt_jlong2ptr(ctx_ptr);
 
     msg_str = (*env)->GetStringUTFChars(env, msg, NULL);
     if (msg_str == NULL) {
@@ -155,4 +162,3 @@ nxt_java_Context_trace(JNIEnv *env, jclass cls, jlong ctx_ptr, jstring msg,
     (*env)->ReleaseStringUTFChars(env, msg, msg_str);
 #endif
 }
-

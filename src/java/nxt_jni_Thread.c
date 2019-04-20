@@ -8,10 +8,12 @@
 
 #include "nxt_jni_Thread.h"
 
+
 static jclass     nxt_java_Thread_class;
 static jmethodID  nxt_java_Thread_currentThread;
 static jmethodID  nxt_java_Thread_getContextClassLoader;
 static jmethodID  nxt_java_Thread_setContextClassLoader;
+
 
 int
 nxt_java_initThread(JNIEnv *env)
