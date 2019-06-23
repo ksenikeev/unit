@@ -3,8 +3,7 @@ from unit.applications.lang.java import TestApplicationJava
 
 
 class TestJavaApplication(TestApplicationJava):
-    def setUpClass():
-        TestApplicationJava().check_modules('java')
+    prerequisites = ['java']
 
     def test_java_application_cookies(self):
         self.load('cookies')
@@ -1032,6 +1031,8 @@ class TestJavaApplication(TestApplicationJava):
     def test_java_application_keepalive_body(self):
         self.load('mirror')
 
+        self.assertEqual(self.post()['status'], 200, 'init')
+
         (resp, sock) = self.post(
             headers={
                 'Connection': 'keep-alive',
@@ -1040,6 +1041,7 @@ class TestJavaApplication(TestApplicationJava):
             },
             start=True,
             body='0123456789' * 500,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')
@@ -1124,15 +1126,6 @@ class TestJavaApplication(TestApplicationJava):
             headers['X-Reply-0'],
             headers['X-Reply-1'],
             'get header names not equal',
-        )
-
-    def test_java_application_get_header_names_empty(self):
-        self.load('get_header_names')
-
-        self.assertNotIn(
-            'X-Reply-0',
-            self.get(headers={}, read_timeout=1)['headers'],
-            'get header names empty',
         )
 
     def test_java_application_header_int(self):

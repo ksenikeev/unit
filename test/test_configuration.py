@@ -3,8 +3,7 @@ from unit.control import TestControl
 
 
 class TestConfiguration(TestControl):
-    def setUpClass():
-        TestControl().check_modules('python')
+    prerequisites = ['python']
 
     def test_json_empty(self):
         self.assertIn('error', self.conf(''), 'empty')
@@ -90,15 +89,8 @@ class TestConfiguration(TestControl):
     def test_applications_string(self):
         self.assertIn('error', self.conf('"{}"', 'applications'), 'string')
 
+    @unittest.skip('not yet, unsafe')
     def test_applications_type_only(self):
-        self.skip_alerts.extend(
-            [
-                r'python module is empty',
-                r'failed to apply new conf',
-                r'process \d+ exited on signal',
-            ]
-        )
-
         self.assertIn(
             'error',
             self.conf({"app": {"type": "python"}}, 'applications'),
@@ -184,16 +176,8 @@ class TestConfiguration(TestControl):
             'relative path',
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet, unsafe')
     def test_listeners_empty(self):
-        self.skip_sanitizer = True
-        self.skip_alerts.extend(
-            [
-                r'failed to apply previous configuration',
-                r'process \d+ exited on signal',
-            ]
-        )
-
         self.assertIn(
             'error', self.conf({"*:7080": {}}, 'listeners'), 'listener empty'
         )
@@ -201,7 +185,7 @@ class TestConfiguration(TestControl):
     def test_listeners_no_app(self):
         self.assertIn(
             'error',
-            self.conf({"*:7080": {"application": "app"}}, 'listeners'),
+            self.conf({"*:7080": {"pass": "applications/app"}}, 'listeners'),
             'listeners no app',
         )
 
@@ -210,7 +194,7 @@ class TestConfiguration(TestControl):
             'success',
             self.conf(
                 {
-                    "listeners": {"*:7080": {"application": "app"}},
+                    "listeners": {"*:7080": {"pass": "applications/app"}},
                     "applications": {
                         "app": {
                             "type": "python",
@@ -229,7 +213,7 @@ class TestConfiguration(TestControl):
             'success',
             self.conf(
                 {
-                    "listeners": {"127.0.0.1:7080": {"application": "app"}},
+                    "listeners": {"127.0.0.1:7080": {"pass": "applications/app"}},
                     "applications": {
                         "app": {
                             "type": "python",
@@ -248,7 +232,7 @@ class TestConfiguration(TestControl):
             'success',
             self.conf(
                 {
-                    "listeners": {"[::1]:7080": {"application": "app"}},
+                    "listeners": {"[::1]:7080": {"pass": "applications/app"}},
                     "applications": {
                         "app": {
                             "type": "python",
@@ -262,20 +246,13 @@ class TestConfiguration(TestControl):
             'explicit ipv6',
         )
 
+    @unittest.skip('not yet, unsafe')
     def test_listeners_no_port(self):
-        self.skip_alerts.extend(
-            [
-                r'invalid listener "127\.0\.0\.1"',
-                r'failed to apply new conf',
-                r'process \d+ exited on signal',
-            ]
-        )
-
         self.assertIn(
             'error',
             self.conf(
                 {
-                    "listeners": {"127.0.0.1": {"application": "app"}},
+                    "listeners": {"127.0.0.1": {"pass": "applications/app"}},
                     "applications": {
                         "app": {
                             "type": "python",
@@ -296,7 +273,7 @@ class TestConfiguration(TestControl):
             'success',
             self.conf(
                 {
-                    "listeners": {"*:7080": {"application": name}},
+                    "listeners": {"*:7080": {"pass": "applications/" + name}},
                     "applications": {
                         name: {
                             "type": "python",
@@ -309,11 +286,8 @@ class TestConfiguration(TestControl):
             ),
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_json_application_many(self):
-        self.skip_alerts.extend(
-            [r'eventfd.+failed', r'epoll.+failed', r'failed to apply']
-        )
         apps = 999
 
         conf = {
@@ -328,7 +302,7 @@ class TestConfiguration(TestControl):
                 for a in range(apps)
             },
             "listeners": {
-                "*:" + str(7000 + a): {"application": "app-" + str(a)}
+                "*:" + str(7000 + a): {"pass": "applications/app-" + str(a)}
                 for a in range(apps)
             },
         }
@@ -336,10 +310,6 @@ class TestConfiguration(TestControl):
         self.assertIn('success', self.conf(conf))
 
     def test_json_application_many2(self):
-        self.skip_alerts.extend(
-            [r'eventfd.+failed', r'epoll.+failed', r'failed to apply']
-        )
-
         conf = {
             "applications": {
                 "app-"
@@ -351,7 +321,7 @@ class TestConfiguration(TestControl):
                 }
                 for a in range(999)
             },
-            "listeners": {"*:7001": {"application": "app-1"}},
+            "listeners": {"*:7001": {"pass": "applications/app-1"}},
         }
 
         self.assertIn('success', self.conf(conf))

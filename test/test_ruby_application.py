@@ -3,8 +3,7 @@ from unit.applications.lang.ruby import TestApplicationRuby
 
 
 class TestRubyApplication(TestApplicationRuby):
-    def setUpClass():
-        TestApplicationRuby().check_modules('ruby')
+    prerequisites = ['ruby']
 
     def test_ruby_application(self):
         self.load('variables')
@@ -84,7 +83,6 @@ class TestRubyApplication(TestApplicationRuby):
             resp['headers']['Query-String'], '', 'query string empty'
         )
 
-    @unittest.expectedFailure
     def test_ruby_application_query_string_absent(self):
         self.load('query_string')
 
@@ -95,7 +93,7 @@ class TestRubyApplication(TestApplicationRuby):
             resp['headers']['Query-String'], '', 'query string absent'
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_ruby_application_server_port(self):
         self.load('server_port')
 
@@ -168,7 +166,7 @@ class TestRubyApplication(TestApplicationRuby):
 
         self.assertEqual(self.post(body=body)['body'], body, 'input each')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_ruby_application_input_rewind(self):
         self.load('input_rewind')
 
@@ -176,7 +174,7 @@ class TestRubyApplication(TestApplicationRuby):
 
         self.assertEqual(self.post(body=body)['body'], body, 'input rewind')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_ruby_application_syntax_error(self):
         self.skip_alerts.extend(
             [
@@ -198,7 +196,7 @@ class TestRubyApplication(TestApplicationRuby):
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+Error in application'),
+            self.wait_for_record(r'\[error\].+Error in application'),
             'errors puts',
         )
 
@@ -210,7 +208,7 @@ class TestRubyApplication(TestApplicationRuby):
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+1234567890'), 'errors puts int'
+            self.wait_for_record(r'\[error\].+1234567890'), 'errors puts int'
         )
 
     def test_ruby_application_errors_write(self):
@@ -221,7 +219,7 @@ class TestRubyApplication(TestApplicationRuby):
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+Error in application'),
+            self.wait_for_record(r'\[error\].+Error in application'),
             'errors write',
         )
 
@@ -238,7 +236,7 @@ class TestRubyApplication(TestApplicationRuby):
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+1234567890'), 'errors write int'
+            self.wait_for_record(r'\[error\].+1234567890'), 'errors write int'
         )
 
     def test_ruby_application_at_exit(self):
@@ -251,7 +249,7 @@ class TestRubyApplication(TestApplicationRuby):
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+At exit called\.'), 'at exit'
+            self.wait_for_record(r'\[error\].+At exit called\.'), 'at exit'
         )
 
     def test_ruby_application_header_custom(self):
@@ -265,7 +263,7 @@ class TestRubyApplication(TestApplicationRuby):
             'header custom',
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_ruby_application_header_custom_non_printable(self):
         self.load('header_custom')
 
@@ -278,7 +276,7 @@ class TestRubyApplication(TestApplicationRuby):
 
         self.assertEqual(self.get()['status'], 200, 'header status')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_ruby_application_header_rack(self):
         self.load('header_rack')
 
@@ -301,7 +299,7 @@ class TestRubyApplication(TestApplicationRuby):
 
         self.assertEqual(self.post(body=body)['body'], body, 'body large')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_ruby_application_body_each_error(self):
         self.load('body_each_error')
 
@@ -310,7 +308,7 @@ class TestRubyApplication(TestApplicationRuby):
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+Failed to run ruby script'),
+            self.wait_for_record(r'\[error\].+Failed to run ruby script'),
             'body each error',
         )
 
@@ -322,6 +320,8 @@ class TestRubyApplication(TestApplicationRuby):
     def test_ruby_keepalive_body(self):
         self.load('mirror')
 
+        self.assertEqual(self.get()['status'], 200, 'init')
+
         (resp, sock) = self.post(
             headers={
                 'Host': 'localhost',
@@ -330,6 +330,7 @@ class TestRubyApplication(TestApplicationRuby):
             },
             start=True,
             body='0123456789' * 500,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')

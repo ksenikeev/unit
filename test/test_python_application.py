@@ -4,8 +4,7 @@ from unit.applications.lang.python import TestApplicationPython
 
 
 class TestPythonApplication(TestApplicationPython):
-    def setUpClass():
-        TestApplicationPython().check_modules('python')
+    prerequisites = ['python']
 
     def test_python_application_variables(self):
         self.load('variables')
@@ -92,7 +91,7 @@ class TestPythonApplication(TestApplicationPython):
             resp['headers']['Query-String'], '', 'query string absent'
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_python_application_server_port(self):
         self.load('server_port')
 
@@ -128,14 +127,14 @@ class TestPythonApplication(TestApplicationPython):
 
         self.stop()
 
-        time.sleep(0.2)
-
         self.assertIsNotNone(
-            self.search_in_log(r'RuntimeError'), 'ctx iter atexit'
+            self.wait_for_record(r'RuntimeError'), 'ctx iter atexit'
         )
 
     def test_python_keepalive_body(self):
         self.load('mirror')
+
+        self.assertEqual(self.get()['status'], 200, 'init')
 
         (resp, sock) = self.post(
             headers={
@@ -145,6 +144,7 @@ class TestPythonApplication(TestApplicationPython):
             },
             start=True,
             body='0123456789' * 500,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')
@@ -171,6 +171,8 @@ class TestPythonApplication(TestApplicationPython):
         )
         self.load('mirror')
 
+        self.assertEqual(self.get()['status'], 200, 'init')
+
         body = '0123456789'
         conns = 3
         socks = []
@@ -184,15 +186,13 @@ class TestPythonApplication(TestApplicationPython):
                 },
                 start=True,
                 body=body,
+                read_timeout=1,
             )
 
             self.assertEqual(resp['body'], body, 'keep-alive open')
             self.assertIn(
                 'success',
-                self.conf(
-                    str(i + 1),
-                    'applications/mirror/processes',
-                ),
+                self.conf(str(i + 1), 'applications/mirror/processes'),
                 'reconfigure',
             )
 
@@ -208,15 +208,13 @@ class TestPythonApplication(TestApplicationPython):
                 start=True,
                 sock=socks[i],
                 body=body,
+                read_timeout=1,
             )
 
             self.assertEqual(resp['body'], body, 'keep-alive request')
             self.assertIn(
                 'success',
-                self.conf(
-                    str(i + 1),
-                    'applications/mirror/processes',
-                ),
+                self.conf(str(i + 1), 'applications/mirror/processes'),
                 'reconfigure 2',
             )
 
@@ -234,15 +232,14 @@ class TestPythonApplication(TestApplicationPython):
             self.assertEqual(resp['body'], body, 'keep-alive close')
             self.assertIn(
                 'success',
-                self.conf(
-                    str(i + 1),
-                    'applications/mirror/processes',
-                ),
+                self.conf(str(i + 1), 'applications/mirror/processes'),
                 'reconfigure 3',
             )
 
     def test_python_keepalive_reconfigure_2(self):
         self.load('mirror')
+
+        self.assertEqual(self.get()['status'], 200, 'init')
 
         body = '0123456789'
 
@@ -254,11 +251,14 @@ class TestPythonApplication(TestApplicationPython):
             },
             start=True,
             body=body,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], body, 'reconfigure 2 keep-alive 1')
 
         self.load('empty')
+
+        self.assertEqual(self.get()['status'], 200, 'init')
 
         (resp, sock) = self.post(
             headers={
@@ -287,11 +287,14 @@ class TestPythonApplication(TestApplicationPython):
     def test_python_keepalive_reconfigure_3(self):
         self.load('empty')
 
+        self.assertEqual(self.get()['status'], 200, 'init')
+
         (resp, sock) = self.http(
             b"""GET / HTTP/1.1
 """,
             start=True,
             raw=True,
+            read_timeout=5,
         )
 
         self.assertIn(
@@ -320,15 +323,17 @@ Connection: close
 
         self.stop()
 
-        self.assertIsNotNone(self.search_in_log(r'At exit called\.'), 'atexit')
+        self.assertIsNotNone(
+            self.wait_for_record(r'At exit called\.'), 'atexit'
+        )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_python_application_start_response_exit(self):
         self.load('start_response_exit')
 
         self.assertEqual(self.get()['status'], 500, 'start response exit')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_python_application_input_iter(self):
         self.load('input_iter')
 
@@ -385,7 +390,7 @@ Connection: close
 
         self.assertEqual(resp['body'], body, 'input read length negative')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_python_application_errors_write(self):
         self.load('errors_write')
 
@@ -394,7 +399,7 @@ Connection: close
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+Error in application\.'),
+            self.wait_for_record(r'\[error\].+Error in application\.'),
             'errors write',
         )
 
@@ -413,7 +418,7 @@ Connection: close
 
         self.assertEqual(self.get()['body'], 'body\n', 'body io file')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_python_application_syntax_error(self):
         self.skip_alerts.append(r'Python failed to import module "wsgi"')
         self.load('syntax_error')
@@ -427,7 +432,7 @@ Connection: close
 
         self.stop()
 
-        self.assertIsNotNone(self.search_in_log(r'Close called\.'), 'close')
+        self.assertIsNotNone(self.wait_for_record(r'Close called\.'), 'close')
 
     def test_python_application_close_error(self):
         self.load('close_error')
@@ -437,7 +442,7 @@ Connection: close
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(r'Close called\.'), 'close error'
+            self.wait_for_record(r'Close called\.'), 'close error'
         )
 
     def test_python_application_not_iterable(self):
@@ -448,7 +453,7 @@ Connection: close
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(
+            self.wait_for_record(
                 r'\[error\].+the application returned not an iterable object'
             ),
             'not iterable',

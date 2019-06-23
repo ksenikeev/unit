@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import time
+import fcntl
 import shutil
 import argparse
 import platform
@@ -46,6 +47,10 @@ class TestUnit(unittest.TestCase):
         TestUnit._set_args(args)
 
         unittest.main()
+
+    @classmethod
+    def setUpClass(cls):
+        TestUnit().check_modules(*cls.prerequisites)
 
     def setUp(self):
         self._run()
@@ -138,7 +143,7 @@ class TestUnit(unittest.TestCase):
                     subprocess.check_output(['which', 'openssl'])
 
                     output = subprocess.check_output(
-                        [self.pardir + '/build/unitd', '--version'],
+                        [self.unitd, '--version'],
                         stderr=subprocess.STDOUT,
                     )
 
@@ -166,6 +171,11 @@ class TestUnit(unittest.TestCase):
             self._stop()
 
     def _run(self):
+        self.unitd = self.pardir + '/build/unitd'
+
+        if not os.path.isfile(self.unitd):
+            exit("Could not find unit")
+
         self.testdir = tempfile.mkdtemp(prefix='unit-test-')
 
         os.mkdir(self.testdir + '/state')
@@ -175,7 +185,7 @@ class TestUnit(unittest.TestCase):
         def _run_unit():
             subprocess.call(
                 [
-                    self.pardir + '/build/unitd',
+                    self.unitd,
                     '--no-daemon',
                     '--modules',  self.pardir + '/build',
                     '--state',    self.testdir + '/state',
@@ -210,7 +220,7 @@ class TestUnit(unittest.TestCase):
 
         subprocess.call(['kill', '-s', 'QUIT', pid])
 
-        for i in range(50):
+        for i in range(150):
             if not os.path.exists(self.testdir + '/unit.pid'):
                 break
             time.sleep(0.1)
@@ -306,6 +316,9 @@ class TestUnit(unittest.TestCase):
     def _set_args(args):
         TestUnit.detailed = args.detailed
         TestUnit.save_log = args.save_log
+
+        if TestUnit.detailed:
+            fcntl.fcntl(sys.stdout.fileno(), fcntl.F_SETFL, 0)
 
     def _print_path_to_log(self):
         print('Path to unit.log:\n' + self.testdir + '/unit.log')

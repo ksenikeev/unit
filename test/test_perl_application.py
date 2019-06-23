@@ -3,8 +3,7 @@ from unit.applications.lang.perl import TestApplicationPerl
 
 
 class TestPerlApplication(TestApplicationPerl):
-    def setUpClass():
-        TestApplicationPerl().check_modules('perl')
+    prerequisites = ['perl']
 
     def test_perl_application(self):
         self.load('variables')
@@ -83,7 +82,6 @@ class TestPerlApplication(TestApplicationPerl):
             resp['headers']['Query-String'], '', 'query string empty'
         )
 
-    @unittest.expectedFailure
     def test_perl_application_query_string_absent(self):
         self.load('query_string')
 
@@ -94,7 +92,7 @@ class TestPerlApplication(TestApplicationPerl):
             resp['headers']['Query-String'], '', 'query string absent'
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_perl_application_server_port(self):
         self.load('server_port')
 
@@ -116,7 +114,7 @@ class TestPerlApplication(TestApplicationPerl):
             'input read parts',
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_perl_application_input_read_offset(self):
         self.load('input_read_offset')
 
@@ -138,7 +136,7 @@ class TestPerlApplication(TestApplicationPerl):
         self.stop()
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+Error in application'),
+            self.wait_for_record(r'\[error\].+Error in application'),
             'errors print',
         )
 
@@ -185,10 +183,10 @@ class TestPerlApplication(TestApplicationPerl):
 
         self.assertEqual(self.get()['body'], 'body\n', 'body io file')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet, unsafe')
     def test_perl_application_syntax_error(self):
         self.skip_alerts.extend(
-            [r'PSGI: Failed to parse script', r'process \d+ exited on signal']
+            [r'PSGI: Failed to parse script']
         )
         self.load('syntax_error')
 
@@ -196,6 +194,8 @@ class TestPerlApplication(TestApplicationPerl):
 
     def test_perl_keepalive_body(self):
         self.load('variables')
+
+        self.assertEqual(self.get()['status'], 200, 'init')
 
         (resp, sock) = self.post(
             headers={
@@ -205,6 +205,7 @@ class TestPerlApplication(TestApplicationPerl):
             },
             start=True,
             body='0123456789' * 500,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')
@@ -227,12 +228,12 @@ class TestPerlApplication(TestApplicationPerl):
         self.assertEqual(self.get()['body'], '21', 'body io fake')
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+IOFake getline\(\) \$\/ is \d+'),
+            self.wait_for_record(r'\[error\].+IOFake getline\(\) \$\/ is \d+'),
             'body io fake $/ value',
         )
 
         self.assertIsNotNone(
-            self.search_in_log(r'\[error\].+IOFake close\(\) called'),
+            self.wait_for_record(r'\[error\].+IOFake close\(\) called'),
             'body io fake close',
         )
 

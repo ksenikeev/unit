@@ -3,8 +3,7 @@ import unittest
 from unit.applications.lang.php import TestApplicationPHP
 
 class TestPHPApplication(TestApplicationPHP):
-    def setUpClass():
-        TestApplicationPHP().check_modules('php')
+    prerequisites = ['php']
 
     def before_disable_functions(self):
         body = self.get()['body']
@@ -85,7 +84,6 @@ class TestPHPApplication(TestApplicationPHP):
             resp['headers']['Query-String'], '', 'query string empty'
         )
 
-    @unittest.expectedFailure
     def test_php_application_query_string_absent(self):
         self.load('query_string')
 
@@ -117,6 +115,8 @@ class TestPHPApplication(TestApplicationPHP):
     def test_php_application_keepalive_body(self):
         self.load('mirror')
 
+        self.assertEqual(self.get()['status'], 200, 'init')
+
         (resp, sock) = self.post(
             headers={
                 'Host': 'localhost',
@@ -125,6 +125,7 @@ class TestPHPApplication(TestApplicationPHP):
             },
             start=True,
             body='0123456789' * 500,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')
@@ -205,7 +206,7 @@ class TestPHPApplication(TestApplicationPHP):
             self.get()['headers']['X-Precision'], '4', 'ini value'
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_php_application_ini_admin_user(self):
         self.load('ini_precision')
 
