@@ -2,6 +2,13 @@
 Obtain And Configure Unit with Java Support
 ###########################################
 
+.. warning::
+
+   Java support was merged into Unit's main branch in version 1.8.0.  For
+   installation and configuration details, see `here
+   <http://unit.nginx.org/configuration/#java>`_.  All instructions below
+   are deprecated and will not be updated.
+
 As of December 2018, Unit's support for Java is in technical preview / beta phase.
 Currently, you can try the code directly from this repository:
 
