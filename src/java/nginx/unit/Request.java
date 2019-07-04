@@ -1,6 +1,7 @@
 package nginx.unit;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -32,6 +33,7 @@ import java.security.Principal;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.DispatcherType;
+import javax.servlet.MultipartConfigElement;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
@@ -54,6 +56,8 @@ import org.eclipse.jetty.util.UrlEncoded;
 import org.eclipse.jetty.util.StringUtil;
 
 import org.eclipse.jetty.server.CookieCutter;
+import org.eclipse.jetty.http.MultiPartFormInputStream;
+import org.eclipse.jetty.http.HttpFields;
 import org.eclipse.jetty.http.MimeTypes;
 
 public class Request implements HttpServletRequest, DynamicPathRequest
@@ -108,6 +112,9 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     private final ServletRequestAttributeListener attr_listener;
 
     public static final String BARE = "nginx.unit.request.bare";
+
+    private MultiPartFormInputStream multi_parts;
+    private MultipartConfigElement multipart_config;
 
     public Request(Context ctx, long req_info, long req) {
         context = ctx;
@@ -271,17 +278,55 @@ public class Request implements HttpServletRequest, DynamicPathRequest
     @Override
     public Part getPart(String name) throws IOException, ServletException
     {
-        log("getPart: " + name);
+        trace("getPart: " + name);
 
-        return null;
+        if (multi_parts == null) {
+            parseMultiParts();
+        }
+
+        return multi_parts.getPart(name);
     }
 
     @Override
     public Collection<Part> getParts() throws IOException, ServletException
     {
-        log("getParts");
+        trace("getParts");
 
-        return Collections.emptyList();
+        if (multi_parts == null) {
+            parseMultiParts();
+        }
+
+        return multi_parts.getParts();
+    }
+
+    private void parseMultiParts() throws IOException, ServletException, IllegalStateException
+    {
+        String content_type = getContentType();
+
+        if (content_type == null ||
+                !MimeTypes.Type.MULTIPART_FORM_DATA.is(HttpFields.valueParameters(content_type, null)))
+        {
+            throw new ServletException("Content-Type != multipart/form-data");
+        }
+
+        if (multipart_config == null) {
+            throw new IllegalStateException("No multipart config for servlet");
+        }
+
+        File tmpDir = (File) context.getAttribute(ServletContext.TEMPDIR);
+
+        multi_parts = new MultiPartFormInputStream(getInputStream(),
+            content_type, multipart_config, tmpDir);
+    }
+
+    public void setMultipartConfig(MultipartConfigElement mce)
+    {
+        multipart_config = mce;
+    }
+
+    public MultipartConfigElement getMultipartConfig()
+    {
+        return multipart_config;
     }
 
     @Override
