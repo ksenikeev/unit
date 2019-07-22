@@ -1,6 +1,5 @@
 import re
 import ssl
-import time
 import subprocess
 import unittest
 from unit.applications.tls import TestApplicationTLS
@@ -139,12 +138,14 @@ class TestTLS(TestApplicationTLS):
 
         self.assertEqual(
             self.conf_get('/certificates/default/key'),
-            'RSA (1024 bits)',
+            'RSA (2048 bits)',
             'certificate key rsa',
         )
 
     def test_tls_certificate_key_ec(self):
         self.load('empty')
+
+        self.openssl_conf()
 
         subprocess.call(
             [
@@ -250,7 +251,7 @@ default_ca = myca
 [ myca ]
 new_certs_dir = %(dir)s
 database = %(database)s
-default_md = sha1
+default_md = sha256
 policy = myca_policy
 serial = %(certserial)s
 default_days = 1
@@ -514,8 +515,6 @@ basicConstraints = critical,CA:TRUE"""
     def test_tls_application_respawn(self):
         self.skip_alerts.append(r'process \d+ exited on signal 9')
         self.load('mirror')
-
-        self.assertEqual(self.get()['status'], 200, 'init')
 
         self.certificate()
 
