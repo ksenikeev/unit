@@ -3,8 +3,7 @@ import unittest
 from unit.applications.lang.php import TestApplicationPHP
 
 class TestPHPApplication(TestApplicationPHP):
-    def setUpClass():
-        TestApplicationPHP().check_modules('php')
+    prerequisites = ['php']
 
     def before_disable_functions(self):
         body = self.get()['body']
@@ -25,6 +24,7 @@ class TestPHPApplication(TestApplicationPHP):
                 'Connection': 'close',
             },
             body=body,
+            url='/index.php/blah?var=val'
         )
 
         self.assertEqual(resp['status'], 200, 'status')
@@ -55,7 +55,8 @@ class TestPHPApplication(TestApplicationPHP):
                 'Connection': 'close',
                 'Content-Length': str(len(body)),
                 'Request-Method': 'POST',
-                'Request-Uri': '/',
+                'Path-Info': '/blah',
+                'Request-Uri': '/index.php/blah?var=val',
                 'Http-Host': 'localhost',
                 'Server-Protocol': 'HTTP/1.1',
                 'Custom-Header': 'blah',
@@ -85,7 +86,6 @@ class TestPHPApplication(TestApplicationPHP):
             resp['headers']['Query-String'], '', 'query string empty'
         )
 
-    @unittest.expectedFailure
     def test_php_application_query_string_absent(self):
         self.load('query_string')
 
@@ -104,6 +104,46 @@ class TestPHPApplication(TestApplicationPHP):
         self.assertEqual(resp['status'], 200, 'status')
         self.assertNotEqual(resp['body'], '', 'body not empty')
 
+    def test_php_application_header_status(self):
+        self.load('header')
+
+        self.assertEqual(
+            self.get(
+                headers={
+                    'Host': 'localhost',
+                    'Connection': 'close',
+                    'X-Header': 'HTTP/1.1 404 Not Found',
+                }
+            )['status'],
+            404,
+            'status',
+        )
+
+        self.assertEqual(
+            self.get(
+                headers={
+                    'Host': 'localhost',
+                    'Connection': 'close',
+                    'X-Header': 'http/1.1 404 Not Found',
+                }
+            )['status'],
+            404,
+            'status case insensitive',
+        )
+
+        self.assertEqual(
+            self.get(
+                headers={
+                    'Host': 'localhost',
+                    'Connection': 'close',
+                    'X-Header': 'HTTP/ 404 Not Found',
+                }
+            )['status'],
+            404,
+            'status version empty',
+        )
+
+
     def test_php_application_404(self):
         self.load('404')
 
@@ -117,6 +157,8 @@ class TestPHPApplication(TestApplicationPHP):
     def test_php_application_keepalive_body(self):
         self.load('mirror')
 
+        self.assertEqual(self.get()['status'], 200, 'init')
+
         (resp, sock) = self.post(
             headers={
                 'Host': 'localhost',
@@ -125,6 +167,7 @@ class TestPHPApplication(TestApplicationPHP):
             },
             start=True,
             body='0123456789' * 500,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')
@@ -205,7 +248,7 @@ class TestPHPApplication(TestApplicationPHP):
             self.get()['headers']['X-Precision'], '4', 'ini value'
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_php_application_ini_admin_user(self):
         self.load('ini_precision')
 
@@ -419,6 +462,45 @@ class TestPHPApplication(TestApplicationPHP):
             self.get()['body'], r'012345', 'disable_classes before'
         )
 
+    def test_php_application_script(self):
+        self.assertIn(
+            'success', self.conf(
+                {
+                    "listeners": {"*:7080": {"pass": "applications/script"}},
+                    "applications": {
+                        "script": {
+                            "type": "php",
+                            "processes": {"spare": 0},
+                            "root": self.current_dir + "/php/script",
+                            "script": "phpinfo.php",
+                        }
+                    },
+                }
+            ), 'configure script'
+        )
+
+        resp = self.get()
+
+        self.assertEqual(resp['status'], 200, 'status')
+        self.assertNotEqual(resp['body'], '', 'body not empty')
+
+    def test_php_application_index_default(self):
+        self.assertIn(
+            'success', self.conf(
+                {
+                    "listeners": {"*:7080": {"pass": "applications/phpinfo"}},
+                    "applications": {
+                        "phpinfo": {
+                            "type": "php",
+                            "processes": {"spare": 0},
+                            "root": self.current_dir + "/php/phpinfo",
+                        }
+                    },
+                }
+            ), 'configure index default'
+        )
+
+        self.assertEqual(self.get()['status'], 200, 'status')
 
 if __name__ == '__main__':
     TestPHPApplication.main()

@@ -3,8 +3,7 @@ from unit.applications.lang.node import TestApplicationNode
 
 
 class TestNodeApplication(TestApplicationNode):
-    def setUpClass():
-        TestApplicationNode().check_modules('node')
+    prerequisites = ['node']
 
     def test_node_application_basic(self):
         self.load('basic')
@@ -111,6 +110,8 @@ class TestNodeApplication(TestApplicationNode):
     def test_node_keepalive_body(self):
         self.load('mirror')
 
+        self.assertEqual(self.get()['status'], 200, 'init')
+
         (resp, sock) = self.post(
             headers={
                 'Host': 'localhost',
@@ -119,6 +120,7 @@ class TestNodeApplication(TestApplicationNode):
             },
             start=True,
             body='0123456789' * 500,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')
@@ -220,7 +222,7 @@ class TestNodeApplication(TestApplicationNode):
             'set header array',
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_node_application_status_message(self):
         self.load('status_message')
 
@@ -331,7 +333,7 @@ class TestNodeApplication(TestApplicationNode):
             'promise second call',
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_node_application_header_name_valid(self):
         self.load('header_name_valid')
 

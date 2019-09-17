@@ -16,6 +16,19 @@ BUILD_DEPENDS = $(BUILD_DEPENDS_unit)
 
 MODULES=
 
+# Ubuntu 19.04
+ifeq ($(CODENAME),disco)
+include Makefile.php
+include Makefile.python27
+include Makefile.python37
+include Makefile.go110
+include Makefile.go111
+include Makefile.perl
+include Makefile.ruby
+include Makefile.jsc-common
+include Makefile.jsc11
+endif
+
 # Ubuntu 18.10
 ifeq ($(CODENAME),cosmic)
 include Makefile.php
@@ -36,13 +49,14 @@ ifeq ($(CODENAME),bionic)
 include Makefile.php
 include Makefile.python27
 include Makefile.python36
+include Makefile.python37
 include Makefile.go19
 include Makefile.go110
 include Makefile.perl
 include Makefile.ruby
 include Makefile.jsc-common
 include Makefile.jsc8
-include Makefile.jsc10
+include Makefile.jsc11
 endif
 
 # Ubuntu 16.04
@@ -62,6 +76,18 @@ ifeq ($(CODENAME),trusty)
 include Makefile.php
 include Makefile.python
 include Makefile.perl
+endif
+
+# Debian 10
+ifeq ($(CODENAME),buster)
+include Makefile.php
+include Makefile.python27
+include Makefile.python37
+include Makefile.go111
+include Makefile.perl
+include Makefile.ruby
+include Makefile.jsc-common
+include Makefile.jsc11
 endif
 
 # Debian 9

@@ -6,8 +6,7 @@ from unit.applications.lang.python import TestApplicationPython
 
 
 class TestPythonProcman(TestApplicationPython):
-    def setUpClass():
-        TestApplicationPython().check_modules('python')
+    prerequisites = ['python']
 
     def pids_for_process(self):
         time.sleep(0.2)
@@ -134,7 +133,7 @@ class TestPythonProcman(TestApplicationPython):
 
         self.stop_all()
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_python_prefork_same_processes(self):
         self.conf('2', 'applications/' + self.app_name + '/processes')
 

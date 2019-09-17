@@ -25,9 +25,9 @@ class TestApplicationGo(TestApplicationProto):
         )
         process.communicate()
 
-        self.conf(
+        self._load_conf(
             {
-                "listeners": {"*:7080": {"application": script}},
+                "listeners": {"*:7080": {"pass": "applications/" + script}},
                 "applications": {
                     script: {
                         "type": "external",

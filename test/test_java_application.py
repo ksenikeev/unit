@@ -3,8 +3,47 @@ from unit.applications.lang.java import TestApplicationJava
 
 
 class TestJavaApplication(TestApplicationJava):
-    def setUpClass():
-        TestApplicationJava().check_modules('java')
+    prerequisites = ['java']
+
+    def test_java_conf_error(self):
+        self.skip_alerts.extend(
+            [
+                r'realpath.*failed',
+                r'failed to apply new conf',
+            ]
+        )
+        self.assertIn(
+            'error',
+            self.conf(
+                {
+                    "listeners": {"*:7080": {"pass": "applications/app"}},
+                    "applications": {
+                        "app": {
+                            "type": "java",
+                            "processes": 1,
+                            "working_directory": self.current_dir
+                            + "/java/empty",
+                            "webapp": self.testdir + "/java",
+                        }
+                    },
+                }
+            ),
+            'conf error',
+        )
+
+    def test_java_war(self):
+        self.load('empty_war')
+
+        self.assertIn(
+            'success',
+            self.conf(
+                '"' + self.testdir + '/java/empty.war"',
+                '/config/applications/empty_war/webapp',
+            ),
+            'configure war',
+        )
+
+        self.assertEqual(self.get()['status'], 200, 'war')
 
     def test_java_application_cookies(self):
         self.load('cookies')
@@ -100,12 +139,16 @@ class TestJavaApplication(TestApplicationJava):
     def test_java_application_session_active(self):
         self.load('session_inactive')
 
-        resp = self.get()
+        resp = self.get(headers={
+            'X-Interval': '4',
+            'Host': 'localhost',
+            'Connection': 'close',
+        })
         session_id = resp['headers']['X-Session-Id']
 
         self.assertEqual(resp['status'], 200, 'session init')
         self.assertEqual(
-            resp['headers']['X-Session-Interval'], '2', 'session interval'
+            resp['headers']['X-Session-Interval'], '4', 'session interval'
         )
         self.assertLess(
             abs(
@@ -148,7 +191,7 @@ class TestJavaApplication(TestApplicationJava):
             resp['headers']['X-Session-Id'], session_id, 'session active 2'
         )
 
-        time.sleep(1)
+        time.sleep(2)
 
         resp = self.get(
             headers={
@@ -165,7 +208,11 @@ class TestJavaApplication(TestApplicationJava):
     def test_java_application_session_inactive(self):
         self.load('session_inactive')
 
-        resp = self.get()
+        resp = self.get(headers={
+            'X-Interval': '1',
+            'Host': 'localhost',
+            'Connection': 'close',
+        })
         session_id = resp['headers']['X-Session-Id']
 
         time.sleep(3)
@@ -1032,6 +1079,8 @@ class TestJavaApplication(TestApplicationJava):
     def test_java_application_keepalive_body(self):
         self.load('mirror')
 
+        self.assertEqual(self.post()['status'], 200, 'init')
+
         (resp, sock) = self.post(
             headers={
                 'Connection': 'keep-alive',
@@ -1040,6 +1089,7 @@ class TestJavaApplication(TestApplicationJava):
             },
             start=True,
             body='0123456789' * 500,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], '0123456789' * 500, 'keep-alive 1')
@@ -1124,15 +1174,6 @@ class TestJavaApplication(TestApplicationJava):
             headers['X-Reply-0'],
             headers['X-Reply-1'],
             'get header names not equal',
-        )
-
-    def test_java_application_get_header_names_empty(self):
-        self.load('get_header_names')
-
-        self.assertNotIn(
-            'X-Reply-0',
-            self.get(headers={}, read_timeout=1)['headers'],
-            'get header names empty',
         )
 
     def test_java_application_header_int(self):

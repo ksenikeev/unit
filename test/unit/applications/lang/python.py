@@ -8,9 +8,9 @@ class TestApplicationPython(TestApplicationProto):
 
         script_path = self.current_dir + '/python/' + script
 
-        self.conf(
+        self._load_conf(
             {
-                "listeners": {"*:7080": {"application": name}},
+                "listeners": {"*:7080": {"pass": "applications/" + name}},
                 "applications": {
                     name: {
                         "type": "python",

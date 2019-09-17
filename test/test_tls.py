@@ -1,39 +1,33 @@
 import re
 import ssl
-import time
 import subprocess
 import unittest
 from unit.applications.tls import TestApplicationTLS
-from unit.main import TestUnit
 
 
 class TestTLS(TestApplicationTLS):
-    def setUpClass():
-        TestUnit().check_modules('python', 'openssl')
+    prerequisites = ['python', 'openssl']
 
     def findall(self, pattern):
         with open(self.testdir + '/unit.log', 'r', errors='ignore') as f:
             return re.findall(pattern, f.read())
-
-    def wait_for_record(self, pattern):
-        for i in range(50):
-            with open(self.testdir + '/unit.log', 'r', errors='ignore') as f:
-                if re.search(pattern, f.read()) is not None:
-                    break
-
-            time.sleep(0.1)
 
     def openssl_date_to_sec_epoch(self, date):
         return self.date_to_sec_epoch(date, '%b %d %H:%M:%S %Y %Z')
 
     def add_tls(self, application='empty', cert='default', port=7080):
         self.conf(
-            {"application": application, "tls": {"certificate": cert}},
+            {
+                "pass": "applications/" + application,
+                "tls": {"certificate": cert}
+            },
             'listeners/*:' + str(port),
         )
 
     def remove_tls(self, application='empty', port=7080):
-        self.conf({"application": application}, 'listeners/*:' + str(port))
+        self.conf(
+            {"pass": "applications/" + application}, 'listeners/*:' + str(port)
+        )
 
     def test_tls_listener_option_add(self):
         self.load('empty')
@@ -94,7 +88,7 @@ class TestTLS(TestApplicationTLS):
             'remove nonexistings certificate',
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_tls_certificate_update(self):
         self.load('empty')
 
@@ -110,7 +104,7 @@ class TestTLS(TestApplicationTLS):
             cert_old, self.get_server_certificate(), 'update certificate'
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_tls_certificate_key_incorrect(self):
         self.load('empty')
 
@@ -144,12 +138,14 @@ class TestTLS(TestApplicationTLS):
 
         self.assertEqual(
             self.conf_get('/certificates/default/key'),
-            'RSA (1024 bits)',
+            'RSA (2048 bits)',
             'certificate key rsa',
         )
 
     def test_tls_certificate_key_ec(self):
         self.load('empty')
+
+        self.openssl_conf()
 
         subprocess.call(
             [
@@ -255,7 +251,7 @@ default_ca = myca
 [ myca ]
 new_certs_dir = %(dir)s
 database = %(database)s
-default_md = sha1
+default_md = sha256
 policy = myca_policy
 serial = %(certserial)s
 default_days = 1
@@ -417,15 +413,18 @@ basicConstraints = critical,CA:TRUE"""
             'certificate chain intermediate server',
         )
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_tls_reconfigure(self):
         self.load('empty')
+
+        self.assertEqual(self.get()['status'], 200, 'init')
 
         self.certificate()
 
         (resp, sock) = self.get(
             headers={'Host': 'localhost', 'Connection': 'keep-alive'},
             start=True,
+            read_timeout=1,
         )
 
         self.assertEqual(resp['status'], 200, 'initial status')
@@ -442,6 +441,8 @@ basicConstraints = critical,CA:TRUE"""
     def test_tls_keepalive(self):
         self.load('mirror')
 
+        self.assertEqual(self.get()['status'], 200, 'init')
+
         self.certificate()
 
         self.add_tls(application='mirror')
@@ -454,6 +455,7 @@ basicConstraints = critical,CA:TRUE"""
             },
             start=True,
             body='0123456789',
+            read_timeout=1,
         )
 
         self.assertEqual(resp['body'], '0123456789', 'keepalive 1')
@@ -470,9 +472,11 @@ basicConstraints = critical,CA:TRUE"""
 
         self.assertEqual(resp['body'], '0123456789', 'keepalive 2')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_tls_keepalive_certificate_remove(self):
         self.load('empty')
+
+        self.assertEqual(self.get()['status'], 200, 'init')
 
         self.certificate()
 
@@ -481,9 +485,10 @@ basicConstraints = critical,CA:TRUE"""
         (resp, sock) = self.get_ssl(
             headers={'Host': 'localhost', 'Connection': 'keep-alive'},
             start=True,
+            read_timeout=1,
         )
 
-        self.conf({"application": "empty"}, 'listeners/*:7080')
+        self.conf({"pass": "applications/empty"}, 'listeners/*:7080')
         self.conf_delete('/certificates/default')
 
         try:
@@ -495,7 +500,7 @@ basicConstraints = critical,CA:TRUE"""
 
         self.assertEqual(resp, None, 'keepalive remove certificate')
 
-    @unittest.expectedFailure
+    @unittest.skip('not yet')
     def test_tls_certificates_remove_all(self):
         self.load('empty')
 
@@ -525,6 +530,7 @@ basicConstraints = critical,CA:TRUE"""
             },
             start=True,
             body='0123456789',
+            read_timeout=1,
         )
 
         app_id = self.findall(r'(\d+)#\d+ "mirror" application started')[0]
